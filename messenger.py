@@ -8,7 +8,15 @@ import json
 import os
 import sys
 import webbrowser
+from tkinter import messagebox, font
 
+#Default Font Family: Segoe UI
+#Default Font Size: 9
+#Default Font Weight: normal
+
+FONT_TYPE = 'Segoe UI'
+FONT_SIZE = 10
+FONT_WEIGHT = 'normal'
 
 KISS_FEND = 0xC0  # Frame start/end marker
 KISS_FESC = 0xDB  # Escape character
@@ -115,7 +123,6 @@ def decode_address(encoded_data):
         address = call
     else:
         address = f"{call}-{ssid}"
-
     return address
 
 def decode_kiss_frame(kiss_frame):
@@ -192,10 +199,15 @@ class PacketRadioApp:
         self.root = root
         root.title("NA7Q Messenger")
 
+        # Create a Font object with your desired font specifications
+        custom_font = font.Font(family=FONT_TYPE, size=FONT_SIZE, weight=FONT_WEIGHT)
+
         formatted_time = datetime.now().strftime("%H:%M:%S")
 
         self.displayed_message_ids = set()
 
+        # Add the following variable to your class
+        self.has_unacknowledged_messages = False
 
         self.message_id = 0  # Add this line to initialize message ID
 
@@ -223,6 +235,7 @@ class PacketRadioApp:
         # Use loaded settings for ip and port
         ip = self.settings.get("server_ip")
         port = self.settings.get("server_port")
+        
 
         # Create a Text widget to display decoded packets
         self.text_widget = tk.Text(root, wrap="char", height=18, width=120)  # word wrap
@@ -231,6 +244,11 @@ class PacketRadioApp:
         # Create a "Messages" Text Display
         self.messages_text_widget = tk.Text(root, wrap="char", height=7, width=120)
         self.messages_text_widget.grid(row=9, column=3, padx=10, pady=10, rowspan=5, sticky="nsew")
+
+        # Configure the font for the text widgets above
+        self.text_widget.configure(font=custom_font)
+        self.messages_text_widget.configure(font=custom_font)
+
 
         # Configure row and column resizing the entire GUI
         for i in range(10):  # Assuming the widgets are in rows 0-9
@@ -286,7 +304,11 @@ class PacketRadioApp:
         self.exit_button = tk.Button(root, width=10, text="Exit", command=self.exit_app)
         self.exit_button.grid(row=0, column=4, pady=5, padx=5, sticky="w")  # Center the button
 
-        # Create a socket and connect to Dire Wolf
+        # Create a "Send Beacon" button
+        #self.send_beacon_button = tk.Button(root, text="Send Beacon", command=self.send_beacon)
+        #self.send_beacon_button.grid(row=4, column=2, pady=5, padx=5, sticky="w")
+
+        # Create a socket and connect to TNC
         try:
             self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.socket.connect((self.settings.get("server_ip", ip), int(self.settings.get("server_port", port))))
@@ -463,7 +485,7 @@ class PacketRadioApp:
                 "tocall": "APOPYT",
                 "server_ip": "127.0.0.1",
                 "server_port": "8100",
-                "digi_path": ""  # Add this line for the new setting
+                "digi_path": "WIDE1-1"  # Add this line for the new setting
             }
 
 
@@ -566,8 +588,8 @@ class PacketRadioApp:
         message_window = tk.Toplevel(self.root)
         message_window.title("Send Message")
 
-    def receive_data(self):
 
+    def receive_data(self):
         while True:
             data = self.socket.recv(1024)
             if not data:
@@ -577,14 +599,58 @@ class PacketRadioApp:
                 frame_buffer.append(byte)
                 if len(frame_buffer) > 1 and byte == KISS_FEND:
                     hex_data = ' '.join([hex(b)[2:].zfill(2) for b in frame_buffer])
-                    formatted_time = datetime.now().strftime("%H:%M:%S")  # Get the current system time
+                    formatted_time = datetime.now().strftime("%H:%M:%S")
                     decoded_packet = decode_kiss_frame(frame_buffer)
                     if decoded_packet:
-                        #self.queue.put((formatted_time, decoded_packet))
                         self.parse_packet(decoded_packet)
+                        # Check for ACK immediately when a new packet is received
+                        self.check_for_immediate_ack(decoded_packet)
                     frame_buffer.clear()
 
+    # Add the following method to your class
+    def check_for_immediate_ack(self, packet):
+        parts = packet.strip().split(':')
+        if len(parts) >= 2:
+            from_callsign = parts[0].split('>')[0].strip()
+            message_text = ':'.join(parts[1:]).strip()
 
+            if "ack" in message_text:
+                parts = message_text.split("ack", 1)
+                if len(parts) == 2 and parts[1].isdigit():
+                    ack_id = parts[1]
+                    process_ack_id(from_callsign, ack_id)
+                    formatted_time = datetime.now().strftime("%H:%M:%S")                    
+                    # Stop the retry timer for the corresponding message ID
+                    self.stop_retry_timer(int(ack_id))
+
+    def stop_retry_timer(self, message_id):
+        formatted_time = datetime.now().strftime("%H:%M:%S")
+        if message_id in self.sent_messages and 'timer' in self.sent_messages[message_id]:
+            # Stop the retry timer
+            self.sent_messages[message_id]['timer'].cancel()
+            # Clear the timer reference
+            self.sent_messages[message_id]['timer'] = None
+            # Remove the message from the sent_messages dictionary
+            del self.sent_messages[message_id]
+            # Display a message indicating that retries are stopped
+            #self.display_packet(formatted_time, f"Retries stopped for message {message_id}. Immediate ACK received.")
+
+        # Check if there are any unacknowledged messages left
+        self.has_unacknowledged_messages = any('timer' in message_info and message_info['timer'] for message_info in self.sent_messages.values())
+
+        # Update the state of the retry button
+        self.update_retry_button_state()
+
+   
+   # Add the following method to your class
+    def update_retry_button_state(self):
+        if not self.has_unacknowledged_messages:
+            # No unacknowledged messages, disable the retry button
+            self.cancel_retry_button['state'] = 'disabled'
+        else:
+            # Enable the retry button
+            self.cancel_retry_button['state'] = 'normal'            
+                
     def update_gui(self):
         try:
             formatted_time, decoded_packet = self.queue.get_nowait()
@@ -613,11 +679,9 @@ class PacketRadioApp:
             #Decide if TCPIP Message
             if message_text.startswith("}") and "TCPIP" in message_text:
                 #create new message text and new callsign
-                message_text = message_text.split("}", 1)[1].strip()
-                
+                message_text = message_text.split("}", 1)[1].strip()                
                 from_callsign = message_text.split('>')[0].strip()
                 message_text = message_text.split(':', 1)[1].strip()
-                
                 
                 if message_text.startswith(":{}".format(callsign)):
                     # Extract and process ACK ID if present
@@ -626,12 +690,14 @@ class PacketRadioApp:
                         if len(parts) == 2 and parts[1].isdigit():
                             ack_id = parts[1]
                             process_ack_id(from_callsign, ack_id)
+                            print("ack processed from parse packet")
                             self.display_packet(formatted_time, f"Ack Received for message {ack_id}.")
                     # End RXd ACK ID for MSG Retries
 
                     if "{" in message_text[-6:]:
                         message_id = message_text.split('{')[1]
                         ack_message = send_ack_message(from_callsign, message_id)  
+                        print("parsed", ack_message)
                         # Encode data using your custom encoding functions
                         ack_message = encode_ui_frame(callsign, tocall, ack_message, path)  # Updated function call
                         raw_packet = decode_kiss_frame(ack_message)
@@ -661,6 +727,7 @@ class PacketRadioApp:
                 if "{" in message_text[-6:]:
                     message_id = message_text.split('{')[1]
                     ack_message = send_ack_message(from_callsign, message_id)  
+
                     # Encode data using your custom encoding functions
                     ack_message = encode_ui_frame(callsign, tocall, ack_message, path)  # Updated function call
                     raw_packet = decode_kiss_frame(ack_message)
@@ -675,6 +742,7 @@ class PacketRadioApp:
                     verbose_message = message_text[11:].split('{')[0].strip()
                     
                     self.display_packet_messages(formatted_time, from_callsign, verbose_message, message_id)
+
 
 
     def display_packet(self, formatted_time, packet):
@@ -725,13 +793,15 @@ class PacketRadioApp:
         # Encode data using your custom encoding functions
         encoded_data = encode_ui_frame(arg1, arg2, formatted_message + "{" + str(self.message_id), path)  # Use self.message_id
 
-        #fix path later on
-        #raw_packet = "{}>{}:{}".format(arg1, arg2, formatted_message + "{" + str(self.message_id))
-
         raw_packet = decode_kiss_frame(encoded_data)
 
         # Initialize formatted_time outside the try block
         formatted_time = datetime.now().strftime("%H:%M:%S")
+        
+        # Set the flag to True since a message has been sent
+        self.has_unacknowledged_messages = True
+        # Update the state of the retry button
+        self.update_retry_button_state()
 
         try:
             # Send the encoded data to the TNC
@@ -767,16 +837,16 @@ class PacketRadioApp:
     def cancel_retry_timer(self):
         formatted_time = datetime.now().strftime("%H:%M:%S")
         canceled_message_ids = []  # Variable to store the canceled message_ids
-    
+
         # Cancel all timers
         for message_id, message_info in self.sent_messages.items():
             if 'timer' in message_info and message_info['timer'] and message_info['timer'].is_alive():
                 message_info['timer'].cancel()
                 canceled_message_ids.append(message_id)
-    
+
         # Clear the sent_messages dictionary
         self.sent_messages.clear()
-    
+
         if canceled_message_ids:
             canceled_message_ids_str = ', '.join(map(str, canceled_message_ids))
             self.display_packet(formatted_time, f"Retry for messages {canceled_message_ids_str} Aborted!")
@@ -797,6 +867,8 @@ class PacketRadioApp:
             if retry_count < MAX_RETRIES:
                 # Calculate the retry interval based on the retry count
                 retry_interval = RETRY_INTERVAL * 2 ** retry_count
+                
+                message_retry_count = retry_count + 1
 
                 # Increment the retry count
                 self.sent_messages[message_id]['retry_count'] += 1
@@ -815,16 +887,13 @@ class PacketRadioApp:
                 formatted_message = self.sent_messages[message_id]['formatted_message']
                 encoded_data = encode_ui_frame(self.callsign_var.get(), self.tocall_var.get(), formatted_message + "{" + str(message_id), path)
                 
-                #fix later to fit in path
-                #raw_packet = "{}>{}{}:{}".format(self.callsign_var.get(), self.tocall_var.get(), formatted_message + "{" + str(message_id)) 
-                
                 raw_packet = decode_kiss_frame(encoded_data)
                 
                 self.socket.send(encoded_data)
 
                 # Display success message in the GUI
                 self.display_packet(formatted_time, raw_packet)
-                self.display_packet(formatted_time, f"Retry Sent successfully (Interval: {retry_interval} seconds)")
+                self.display_packet(formatted_time, f"Retry {message_retry_count} Sent successfully (Interval: {retry_interval} seconds)")
 
                 # Restart the timer for the next retry
                 self.sent_messages[message_id]['timer'] = threading.Timer(retry_interval, self.retry_message, args=[message_id])
