@@ -266,7 +266,7 @@ class PacketRadioApp:
         self.message_entry.bind("<Tab>", self.focus_send_button)
 
         # Create a "Cancel Retry" button
-        self.cancel_retry_button = tk.Button(root, text="Abort Retries", command=lambda: self.cancel_retry_timer(self.message_id))
+        self.cancel_retry_button = tk.Button(root, text="Abort Retries", command=self.cancel_retry_timer)
         self.cancel_retry_button.grid(row=19, column=4, pady=5, padx=5, sticky="w")  # Center the button
 
         # Disable the button initially (assuming self.message_id is set appropriately)
@@ -764,15 +764,26 @@ class PacketRadioApp:
             error_message = f"Failed to send message: {str(e)}"
             self.display_packet(formatted_time, error_message)
 
-    def cancel_retry_timer(self, message_id):
+    def cancel_retry_timer(self):
         formatted_time = datetime.now().strftime("%H:%M:%S")
-        if message_id in self.sent_messages:
-            if self.sent_messages[message_id]['timer'] and self.sent_messages[message_id]['timer'].is_alive():
-                self.sent_messages[message_id]['timer'].cancel()
-                self.display_packet(formatted_time, "Retry Aborted!")
-                # Disable the "Cancel Retry" button after canceling the retry timer
-                self.cancel_retry_button['state'] = 'disabled'
-
+        canceled_message_ids = []  # Variable to store the canceled message_ids
+    
+        # Cancel all timers
+        for message_id, message_info in self.sent_messages.items():
+            if 'timer' in message_info and message_info['timer'] and message_info['timer'].is_alive():
+                message_info['timer'].cancel()
+                canceled_message_ids.append(message_id)
+    
+        # Clear the sent_messages dictionary
+        self.sent_messages.clear()
+    
+        if canceled_message_ids:
+            canceled_message_ids_str = ', '.join(map(str, canceled_message_ids))
+            self.display_packet(formatted_time, f"Retry for messages {canceled_message_ids_str} Aborted!")
+            # Disable the "Cancel Retry" button after canceling all timers
+            self.cancel_retry_button['state'] = 'disabled'
+        else:
+            self.display_packet(formatted_time, "No active retry timers found to abort.")
 
     def retry_message(self, message_id):
         global received_acks, RETRY_INTERVAL, MAX_RETRIES
