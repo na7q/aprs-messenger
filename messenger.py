@@ -14,6 +14,7 @@ from tkinter import messagebox, font
 #Default Font Size: 9
 #Default Font Weight: normal
 
+
 FONT_TYPE = 'Segoe UI'
 FONT_SIZE = 10
 FONT_WEIGHT = 'normal'
@@ -37,6 +38,280 @@ SETTINGS_FILE = "settings.conf"
 print("Current Working Directory:", os.getcwd())
 
 received_acks = {}
+
+TOCALL_DATA = {
+    "BEACON": {"vendor": "APRS", "model": "Generic"},
+    "ID": {"vendor": "APRS", "model": "Generic"},
+    "AP1WWX": {"vendor": "TAPR", "model": "T-238+", "class": "wx"},
+    "AP4R??": {"vendor": "Open Source", "model": "APRS4R", "class": "software"},
+    "APAEP1": {"vendor": "Paraguay Space Agency (AEP)", "model": "EIRUAPRSDIGIS&FV1", "class": "satellite"},
+    "APAF??": {"model": "AFilter"},
+    "APAG??": {"model": "AGate"},
+    "APAGW": {"vendor": "SV2AGW", "model": "AGWtracker", "class": "software", "os": "Windows"},
+    "APAGW?": {"vendor": "SV2AGW", "model": "AGWtracker", "class": "software", "os": "Windows"},
+    "APAH??": {"model": "AHub"},
+    "APAM??": {"vendor": "Altus Metrum", "model": "AltOS", "class": "tracker"},
+    "APAND?": {"vendor": "Open Source", "model": "APRSdroid", "os": "Android", "class": "app"},
+    "APAT51": {"vendor": "Anytone", "model": "AT-D578", "class": "rig"},
+    "APAT81": {"vendor": "Anytone", "model": "AT-D878", "class": "ht"},
+    "APAT??": {"vendor": "Anytone"},
+    "APATAR": {"vendor": "TA7W/OH2UDS Baris Dinc and TA6AEU", "model": "ATA-R APRS Digipeater", "class": "digi"},
+    "APAVT5": {"vendor": "SainSonic", "model": "AP510", "class": "tracker"},
+    "APAW??": {"vendor": "SV2AGW", "model": "AGWPE", "class": "software", "os": "Windows"},
+    "APAX??": {"model": "AFilterX"},
+    "APB2MF": {"vendor": "Mike, DL2MF", "model": "MF2APRS Radiosonde tracking tool", "class": "software", "os": "Windows"},
+    "APBK??": {"vendor": "PY5BK", "model": "Bravo Tracker", "class": "tracker"},
+    "APBL??": {"vendor": "BigRedBee", "model": "BeeLine GPS", "class": "tracker"},
+    "APBM??": {"vendor": "R3ABM", "model": "BrandMeister DMR"},
+    "APBPQ??": {"vendor": "John Wiseman, G8BPQ", "model": "BPQ32", "class": "software", "os": "Windows"},
+    "APBSD?": {"vendor": "hambsd.org", "model": "HamBSD"},
+    "APBT62": {"vendor": "BTech", "model": "DMR 6x2"},
+    "APC???": {"vendor": "Rob Wittner, KZ5RW", "model": "APRS/CE", "class": "app"},
+    "APCDS0": {"vendor": "ZS6LMG", "model": "cell tracker", "class": "tracker"},
+    "APCLEY": {"vendor": "ZS6EY", "model": "EYTraker", "class": "tracker"},
+    "APCLEZ": {"vendor": "ZS6EY", "model": "Telit EZ10 GSM application", "class": "tracker"},
+    "APCLUB": {"model": "Brazil APRS network"},
+    "APCLWX": {"vendor": "ZS6EY", "model": "EYWeather", "class": "wx"},
+    "APCN??": {"vendor": "DG5OAW", "model": "carNET"},
+    "APCSMS": {"vendor": "USNA", "model": "Cosmos"},
+    "APCSS": {"vendor": "AMSAT", "model": "CubeSatSim CubeSat Simulator"},
+    "APCTLK": {"vendor": "Open Source", "model": "Codec2Talkie", "class": "app"},
+    "APCWP8": {"vendor": "GM7HHB", "model": "WinphoneAPRS", "class": "app"},
+    "APDF??": {"model": "Automatic DF units"},
+    "APDG??": {"vendor": "Jonathan, G4KLX", "model": "ircDDB Gateway", "class": "dstar"},
+    "APDI??": {"vendor": "Bela, HA5DI", "model": "DIXPRS", "class": "software"},
+    "APDNO?": {"vendor": "DO3SWW", "model": "APRSduino", "class": "tracker", "os": "embedded"},
+    "APDPRS": {"vendor": "unknown", "model": "D-Star APDPRS", "class": "dstar"},
+    "APDR??": {"vendor": "Open Source", "model": "APRSdroid", "os": "Android", "class": "app"},
+    "APDS??": {"vendor": "SP9UOB", "model": "dsDIGI", "os": "embedded"},
+    "APDST?": {"vendor": "SP9UOB", "model": "dsTracker", "os": "embedded"},
+    "APDT??": {"vendor": "unknown", "model": "APRStouch Tone (DTMF)"},
+    "APDU??": {"vendor": "JA7UDE", "model": "U2APRS", "class": "app", "os": "Android"},
+    "APDV??": {"vendor": "OE6PLD", "model": "SSTV with APRS", "class": "software"},
+    "APDW??": {"vendor": "WB2OSZ", "model": "DireWolf"},
+    "APDnnn": {"vendor": "Open Source", "model": "aprsd", "class": "software", "os": "Linux/Unix"},
+    "APE2A?": {"vendor": "NoseyNick, VA3NNW", "model": "Email-2-APRS gateway", "class": "software", "os": "Linux/Unix"},
+    "APE???": {"model": "Telemetry devices"},
+    "APECAN": {"vendor": "KT5TK/DL7AD", "model": "Pecan Pico APRS Balloon Tracker", "class": "tracker"},
+    "APELK?": {"vendor": "WB8ELK", "model": "Balloon tracker", "class": "tracker"},
+    "APERS?": {"vendor": "Jason, KG7YKZ", "model": "Runner tracking", "class": "tracker"},
+    "APERXQ": {"vendor": "PE1RXQ", "model": "PE1RXQ APRS Tracker", "class": "tracker"},
+    "APESP?": {"vendor": "LY3PH", "model": "APRS-ESP", "os": "embedded"},
+    "APFG??": {"vendor": "KP4DJT", "model": "Flood Gage", "class": "software"},
+    "APFI??": {"vendor": "aprs.fi", "class": "app"},
+    "APFII?": {"model": "iPhone/iPad app", "vendor": "aprs.fi", "os": "ios", "class": "app"},
+    "APGBLN": {"vendor": "NW5W", "model": "GoBalloon", "class": "tracker"},
+    "APGO??": {"vendor": "AA3NJ", "model": "APRS-Go", "class": "app"},
+    "APHAX?": {"vendor": "PY2UEP", "model": "SM2APRS SondeMonitor", "class": "software", "os": "Windows"},
+    "APHBL?": {"vendor": "KF7EEL", "model": "HBLink D-APRS Gateway", "class": "software"},
+    "APHH?": {"vendor": "Steven D. Bragg, KA9MVA", "model": "HamHud", "class": "tracker"},
+    "APHK??": {"vendor": "LA1BR", "model": "Digipeater/tracker"},
+    "APHMEY": {"vendor": "Tapio Heiskanen, OH2TH", "model": "APRS-IS Client for Athom Homey", "contact": "oh2th@iki.fi"},
+    "APHPIA": {"vendor": "HP3ICC", "model": "Arduino APRS"},
+    "APHPIB": {"vendor": "HP3ICC", "model": "Python APRS Beacon"},
+    "APHPIW": {"vendor": "HP3ICC", "model": "Python APRS WX"},
+    "APHT??": {"vendor": "IU0AAC", "model": "HMTracker", "class": "tracker"},
+    "APHW??": {"vendor": "HamWAN"},
+    "API282": {"vendor": "Icom", "model": "IC-2820", "class": "dstar"},
+    "API31": {"vendor": "Icom", "model": "IC-31", "class": "dstar"},
+    "API410": {"vendor": "Icom", "model": "IC-4100", "class": "dstar"},
+    "API51": {"vendor": "Icom", "model": "IC-51", "class": "dstar"},
+    "API510": {"vendor": "Icom", "model": "IC-5100", "class": "dstar"},
+    "API710": {"vendor": "Icom", "model": "IC-7100", "class": "dstar"},
+    "API80": {"vendor": "Icom", "model": "IC-80", "class": "dstar"},
+    "API880": {"vendor": "Icom", "model": "IC-880", "class": "dstar"},
+    "API910": {"vendor": "Icom", "model": "IC-9100", "class": "dstar"},
+    "API92": {"vendor": "Icom", "model": "IC-92", "class": "dstar"},
+    "API970": {"vendor": "Icom", "model": "IC-9700", "class": "dstar"},
+    "API???": {"vendor": "Icom", "model": "unknown", "class": "dstar"},
+    "APIC??": {"vendor": "HA9MCQ", "model": "PICiGATE"},
+    "APIE??": {"vendor": "W7KMV", "model": "PiAPRS"},
+    "APIN??": {"vendor": "AB0WV", "model": "PinPoint"},
+    "APIZCI": {"vendor": "TA7W/OH2UDS and TA6AEU", "model": "hymTR IZCI Tracker", "class": "tracker", "os": "embedded"},
+    "APJ8??": {"vendor": "KN4CRD", "model": "JS8Call", "class": "software"},
+    "APJA??": {"vendor": "K4HG & AE5PL", "model": "JavAPRS"},
+    "APJE??": {"vendor": "Gregg Wonderly, W5GGW", "model": "JeAPRS"},
+    "APJI??": {"vendor": "Peter Loveall, AE5PL", "model": "jAPRSIgate", "class": "software"},
+    "APJID2": {"vendor": "Peter Loveall, AE5PL", "model": "D-Star APJID2", "class": "dstar"},
+    "APJS??": {"vendor": "Peter Loveall, AE5PL", "model": "javAPRSSrvr"},
+    "APJY??": {"vendor": "KA2DDO", "model": "YAAC", "class": "software"},
+    "APK003": {"vendor": "Kenwood", "model": "TH-D72", "class": "ht"},
+    "APK004": {"vendor": "Kenwood", "model": "TH-D74", "class": "ht"},
+    "APK005": {"vendor": "Kenwood", "model": "TH-D75", "class": "ht"},
+    "APK0??": {"vendor": "Kenwood", "model": "TH-D7", "class": "ht"},
+    "APK1??": {"vendor": "Kenwood", "model": "TM-D700", "class": "rig"},
+    "APKHTW": {"vendor": "Kip, W3SN", "model": "Tempest Weather Bridge", "class": "wx", "os": "embedded", "contact": "w3sn@moxracing.33mail.com"},
+    "APKRAM": {"vendor": "kramstuff.com", "model": "Ham Tracker", "class": "app", "os": "ios"},
+    "APLC??": {"vendor": "DL3DCW", "model": "APRScube"},
+    "APLDI?": {"vendor": "David, OK2DDS", "model": "LoRa IGate/Digipeater", "class": "digi"},
+    "APLDM?": {"vendor": "David, OK2DDS", "model": "LoRa Meteostation", "class": "wx"},
+    "APLETK": {"vendor": "DL5TKL", "model": "T-Echo", "class": "tracker", "os": "embedded", "contact": "cfr34k-git@tkolb.de"},
+    "APLG??": {"vendor": "OE5BPA", "model": "LoRa Gateway/Digipeater", "class": "digi"},
+    "APLIG?": {"vendor": "TA2MUN/TA9OHC", "model": "LightAPRS Tracker", "class": "tracker"},
+    "APLM??": {"vendor": "WA0TQG", "class": "software"},
+    "APLO??": {"vendor": "SQ9MDD", "model": "LoRa KISS TNC/Tracker", "class": "tracker"},
+    "APLP0?": {"vendor": "SQ9P", "model": "fajne digi", "class": "digi", "os": "embedded", "contact": "sq9p.peter@gmail.com"},
+    "APLP1?": {"vendor": "SQ9P", "model": "LORA/FSK/AFSK fajny tracker", "class": "tracker", "os": "embedded", "contact": "sq9p.peter@gmail.com"},
+    "APLRG?": {"vendor": "Ricardo, CD2RXU", "model": "ESP32 LoRa iGate", "class": "igate", "os": "embedded", "contact": "richonguzman@gmail.com"},
+    "APLRT?": {"vendor": "Ricardo, CD2RXU", "model": "ESP32 LoRa Tracker", "class": "tracker", "os": "embedded", "contact": "richonguzman@gmail.com"},
+    "APLS??": {"vendor": "SARIMESH", "model": "SARIMESH", "class": "software"},
+    "APLT??": {"vendor": "OE5BPA", "model": "LoRa Tracker", "class": "tracker"},
+    "APLU0?": {"vendor": "SP9UP", "model": "ESP32/SX12xx LoRa iGate / Digi", "class": "digi", "os": "embedded", "contact": "wajdzik.m@gmail.com"},
+    "APLU1?": {"vendor": "SP9UP", "model": "ESP32/SX12xx LoRa Tracker", "class": "tracker", "os": "embedded", "contact": "wajdzik.m@gmail.com"},
+    "APMG??": {"vendor": "Alex, AB0TJ", "model": "PiCrumbs and MiniGate", "class": "software"},
+    "APMI01": {"vendor": "Microsat", "os": "embedded", "model": "WX3in1"},
+    "APMI02": {"vendor": "Microsat", "os": "embedded", "model": "WXEth"},
+    "APMI03": {"vendor": "Microsat", "os": "embedded", "model": "PLXDigi"},
+    "APMI04": {"vendor": "Microsat", "os": "embedded", "model": "WX3in1 Mini"},
+    "APMI05": {"vendor": "Microsat", "os": "embedded", "model": "PLXTracker"},
+    "APMI06": {"vendor": "Microsat", "os": "embedded", "model": "WX3in1 Plus 2.0"},
+    "APMI??": {"vendor": "Microsat", "os": "embedded"},
+    "APMON?": {"vendor": "Amon Schumann, DL9AS", "model": "APRS Balloon Tracker", "class": "tracker", "os": "embedded"},
+    "APMPAD": {"vendor": "DF1JSL", "model": "Multi-Purpose APRS Daemon", "class": "service", "contact": "joerg.schultze.lutter@gmail.com", "features": ["messaging"]},
+    "APMQ??": {"vendor": "WB2OSZ", "model": "Ham Radio of Things"},
+    "APMT??": {"vendor": "LZ1PPL", "model": "Micro APRS Tracker", "class": "tracker"},
+    "APN102": {"vendor": "Gregg Wonderly, W5GGW", "model": "APRSNow", "class": "app", "os": "ipad"},
+    "APN2??": {"vendor": "VE4KLM", "model": "NOSaprs for JNOS 2.0"},
+    "APN3??": {"vendor": "Kantronics", "model": "KPC-3"},
+    "APN9??": {"vendor": "Kantronics", "model": "KPC-9612"},
+    "APNCM": {"vendor": "Keith Kaiser, WA0TJT", "model": "Net Control Manager", "class": "software", "os": "browser", "contact": "wa0tjt@gmail.com"},
+    "APND??": {"vendor": "PE1MEW", "model": "DIGI_NED"},
+    "APNIC4": {"vendor": "SQ5EKU", "model": "BidaTrak", "class": "tracker", "os": "embedded"},
+    "APNJS?": {"vendor": "Julien Sansonnens, HB9HRD", "model": "Web messaging service", "class": "service", "contact": "julien.owls@gmail.com", "features": ["messaging"]},
+    "APNK01": {"vendor": "Kenwood", "model": "TM-D700", "class": "rig", "features": ["messaging"]},
+    "APNK80": {"vendor": "Kantronics", "model": "KAM"},
+    "APNKMP": {"vendor": "Kantronics", "model": "KAM+"},
+    "APNKMX": {"vendor": "Kantronics", "model": "KAM-XL"},
+    "APNM??": {"vendor": "MFJ", "model": "TNC"},
+    "APNP??": {"vendor": "PacComm", "model": "TNC"},
+    "APNT??": {"vendor": "SV2AGW", "model": "TNT TNC as a digipeater", "class": "digi"},
+    "APNU??": {"vendor": "IW3FQG", "model": "UIdigi", "class": "digi"},
+    "APNV0??": {"vendor": "SQ8L", "model": "VP-Digi", "os": "embedded"},
+    "APNV1??": {"vendor": "SQ8L", "model": "VP-Node", "os": "embedded"},
+    "APNV??": {"vendor": "SQ8L"},
+    "APNW??": {"vendor": "SQ3FYK", "model": "WX3in1", "os": "embedded"},
+    "APNX??": {"vendor": "K6DBG", "model": "TNC-X"},
+    "APOA??": {"vendor": "OpenAPRS", "model": "app", "class": "app", "os": "ios"},
+    "APOCSG": {"vendor": "N0AGI", "model": "POCSAG"},
+    "APOG7?": {"vendor": "OpenGD77", "model": "OpenGD77", "os": "embedded", "contact": "Roger VK3KYY/G4KYF"},
+    "APOLU?": {"vendor": "AMSAT-LU", "model": "Oscar", "class": "satellite"},
+    "APOPYT": {"vendor": "Mike, NA7Q", "model": "NA7Q Messenger", "class": "software", "contact": "mike.ph4@gmail.com"},
+    "APOSAT": {"vendor": "Mike, NA7Q", "model": "Open Source Satellite Gateway", "class": "service", "contact": "mike.ph4@gmail.com"},
+    "APOSMS": {"vendor": "Mike, NA7Q", "model": "Open Source SMS Gateway", "class": "service", "contact": "mike.ph4@gmail.com", "features": ["messaging"]},
+    "APOT??": {"vendor": "Argent Data Systems", "model": "OpenTracker", "class": "tracker"},
+    "APOVU?": {"vendor": "K J Somaiya Institute", "model": "BeliefSat"},
+    "APOZ??": {"vendor": "OZ1EKD, OZ7HVO", "model": "KissOZ", "class": "tracker"},
+    "APP6??": {"model": "APRSlib"},
+    "APPCO?": {"vendor": "RadCommSoft, LLC", "model": "PicoAPRSTracker", "class": "tracker", "os": "embedded", "contact": "ab4mw@radcommsoft.com"},
+    "APPIC?": {"vendor": "DB1NTO", "model": "PicoAPRS", "class": "tracker"},
+    "APPM??": {"vendor": "DL1MX", "model": "rtl-sdr Python iGate", "class": "software"},
+    "APPRIS": {"vendor": "DF1JSL", "model": "Apprise APRS plugin", "class": "service", "contact": "joerg.schultze.lutter@gmail.com", "features": ["messaging"]},
+    "APPT??": {"vendor": "JF6LZE", "model": "KetaiTracker", "class": "tracker"},
+    "APQTH?": {"vendor": "Weston Bustraan, W8WJB", "model": "QTH.app", "class": "software", "os": "macOS", "features": ["messaging"]},
+    "APR2MF": {"vendor": "Mike, DL2MF", "model": "MF2wxAPRS Tinkerforge gateway", "class": "wx", "os": "Windows"},
+    "APR8??": {"vendor": "Bob Bruninga, WB4APR", "model": "APRSdos", "class": "software"},
+    "APRARX": {"vendor": "Open Source", "model": "radiosonde_auto_rx", "class": "software", "os": "Linux/Unix"},
+    "APRFG?": {"vendor": "RF.Guru", "contact": "info@rf.guru"},
+    "APRFGB": {"vendor": "RF.Guru", "model": "APRS LoRa Pager", "os": "embedded", "contact": "info@rf.guru"},
+    "APRFGD": {"vendor": "RF.Guru", "model": "APRS Digipeater", "class": "digi", "os": "embedded", "contact": "info@rf.guru"},
+    "APRFGH": {"vendor": "RF.Guru", "model": "Hotspot", "class": "rig", "os": "embedded", "contact": "info@rf.guru"},
+    "APRFGI": {"vendor": "RF.Guru", "model": "LoRa APRS iGate", "class": "igate", "os": "embedded", "contact": "info@rf.guru"},
+    "APRFGL": {"vendor": "RF.Guru", "model": "Lora APRS Digipeater", "class": "digi", "os": "embedded", "contact": "info@rf.guru"},
+    "APRFGM": {"vendor": "RF.Guru", "model": "Mobile Radio", "class": "rig", "os": "embedded", "contact": "info@rf.guru"},
+    "APRFGP": {"vendor": "RF.Guru", "model": "Portable Radio", "class": "ht", "os": "embedded", "contact": "info@rf.guru"},
+    "APRFGR": {"vendor": "RF.Guru", "model": "Repeater", "class": "rig", "os": "embedded", "contact": "info@rf.guru"},
+    "APRFGT": {"vendor": "RF.Guru", "model": "LoRa APRS Tracker", "class": "tracker", "os": "embedded", "contact": "info@rf.guru"},
+    "APRFGW": {"vendor": "RF.Guru", "model": "LoRa APRS Weather Station", "class": "wx", "os": "embedded", "contact": "info@rf.guru"},
+    "APRG??": {"vendor": "OH2GVE", "model": "aprsg", "class": "software", "os": "Linux/Unix"},
+    "APRHH?": {"vendor": "Steven D. Bragg, KA9MVA", "model": "HamHud", "class": "tracker"},
+    "APRNOW": {"vendor": "Gregg Wonderly, W5GGW", "model": "APRSNow", "class": "app", "os": "ipad"},
+    "APRPR?": {"vendor": "Robert DM4RW, Peter DL6MAA", "model": "Teensy RPR TNC", "class": "tracker", "os": "embedded", "contact": "dm4rw@skywaves.de"},
+    "APRRDZ": {"model": "rdzTTGOsonde", "vendor": "DL9RDZ", "class": "tracker"},
+    "APRRF?": {"vendor": "Jean-Francois Huet F1EVM", "model": "Tracker for RRF", "class": "tracker", "os": "embedded", "contact": "f1evm@f1evm.fr", "features": ["messaging"]},
+    "APRRT?": {"vendor": "RPC Electronics", "model": "RTrak", "class": "tracker"},
+    "APRS": {"vendor": "Unknown", "model": "Unknown"},
+    "APRX??": {"vendor": "Kenneth W. Finnegan, W6KWF", "model": "Aprx", "class": "igate", "os": "Linux/Unix"},
+    "APS???": {"vendor": "Brent Hildebrand, KH2Z", "model": "APRS+SA", "class": "software"},
+    "APSAR": {"vendor": "ZL4FOX", "model": "SARTrack", "class": "software", "os": "Windows"},
+    "APSC??": {"vendor": "OH2MQK, OH7LZB", "model": "aprsc", "class": "software"},
+    "APSF??": {"vendor": "F5OPV, SFCP_LABS", "model": "embedded APRS devices", "os": "embedded"},
+    "APSFLG": {"vendor": "F5OPV, SFCP_LABS", "model": "LoRa/APRS Gateway", "class": "digi", "os": "embedded"},
+    "APSFRP": {"vendor": "F5OPV, SFCP_LABS", "model": "VHF/UHF Repeater", "os": "embedded"},
+    "APSFTL": {"vendor": "F5OPV, SFCP_LABS", "model": "LoRa/APRS Telemetry Reporter", "os": "embedded"},
+    "APSFWX": {"vendor": "F5OPV, SFCP_LABS", "model": "embedded Weather Station", "class": "wx", "os": "embedded"},
+    "APSK63": {"vendor": "Chris Moulding, G4HYG", "model": "APRS Messenger", "class": "software", "os": "Windows"},
+    "APSMS?": {"vendor": "Paul Dufresne", "model": "SMS gateway", "class": "software"},
+    "APSRF?": {"vendor": "SoftRF", "model": "Ham Edition", "class": "tracker", "os": "embedded"},
+    "APSTM?": {"vendor": "W7QO", "model": "Balloon tracker", "class": "tracker"},
+    "APSTPO": {"vendor": "N0AGI", "model": "Satellite Tracking and Operations", "class": "software"},
+    "APT2??": {"vendor": "Byonics", "model": "TinyTrak2", "class": "tracker"},
+    "APT3??": {"vendor": "Byonics", "model": "TinyTrak3", "class": "tracker"},
+    "APT4??": {"vendor": "Byonics", "model": "TinyTrak4", "class": "tracker"},
+    "APTB??": {"vendor": "BG5HHP", "model": "TinyAPRS"},
+    "APTCHE": {"vendor": "PU3IKE", "model": "TcheTracker, Tcheduino", "class": "tracker"},
+    "APTCMA": {"vendor": "Cleber, PU1CMA", "model": "CAPI Tracker", "class": "tracker"},
+    "APTEMP": {"vendor": "KL7AF", "model": "APRS-Tempest Weather Gateway", "class": "wx", "os": "Linux/Unix", "contact": "kl7af@foghaven.net"},
+    "APTKJ?": {"vendor": "W9JAJ", "model": "ATTiny APRS Tracker", "os": "embedded"},
+    "APTNG?": {"vendor": "Filip YU1TTN", "model": "Tango Tracker", "class": "tracker"},
+    "APTPN?": {"vendor": "KN4ORB", "model": "TARPN Packet Node Tracker", "class": "tracker"},
+    "APTR??": {"vendor": "Motorola", "model": "MotoTRBO"},
+    "APTT?": {"vendor": "Byonics", "model": "TinyTrak", "class": "tracker"},
+    "APTW??": {"vendor": "Byonics", "model": "WXTrak", "class": "wx"},
+    "APU1??": {"vendor": "Roger Barker, G4IDE", "model": "UI-View16", "class": "software", "os": "Windows"},
+    "APU2?": {"vendor": "Roger Barker, G4IDE", "model": "UI-View32", "class": "software", "os": "Windows"},
+    "APUDR?": {"vendor": "NW Digital Radio", "model": "UDR"},
+    "APVE??": {"vendor": "unknown", "model": "EchoLink"},
+    "APVM??": {"vendor": "Digital Radio China Club", "model": "DRCC-DVM", "class": "igate"},
+    "APVR??": {"vendor": "unknown", "model": "IRLP"},
+    "APW9??": {"vendor": "Mile Strk, 9A9Y", "model": "WX Katarina", "class": "wx", "os": "embedded", "features": ["messaging"]},
+    "APWA??": {"vendor": "KJ4ERJ", "model": "APRSISCE", "class": "software", "os": "Android"},
+    "APWEE?": {"vendor": "Tom Keffer and Matthew Wall", "model": "WeeWX Weather Software", "class": "software", "os": "Linux/Unix"},
+    "APWM??": {"vendor": "KJ4ERJ", "model": "APRSISCE", "class": "software", "os": "Windows Mobile", "features": ["messaging", "item-in-msg"]},
+    "APWW??": {"vendor": "KJ4ERJ", "model": "APRSIS32", "class": "software", "os": "Windows", "features": ["messaging", "item-in-msg"]},
+    "APWnnn": {"vendor": "Sproul Brothers", "model": "WinAPRS", "class": "software", "os": "Windows"},
+    "APX???": {"vendor": "Open Source", "model": "Xastir", "class": "software", "os": "Linux/Unix"},
+    "APXR??": {"vendor": "G8PZT", "model": "Xrouter"},
+    "APY01D": {"vendor": "Yaesu", "model": "FT1D", "class": "ht"},
+    "APY02D": {"vendor": "Yaesu", "model": "FT2D", "class": "ht"},
+    "APY05D": {"vendor": "Yaesu", "model": "FT5D", "class": "ht"},
+    "APY300": {"vendor": "Yaesu", "model": "FTM-300D", "class": "rig"},
+    "APY400": {"vendor": "Yaesu", "model": "FTM-400", "class": "rig"},
+    "APYS??": {"vendor": "W2GMD", "model": "Python APRS", "class": "software"},
+    "APZ18": {"vendor": "IW3FQG", "model": "UIdigi", "class": "digi"},
+    "APZ186": {"vendor": "IW3FQG", "model": "UIdigi", "class": "digi"},
+    "APZ19": {"vendor": "IW3FQG", "model": "UIdigi", "class": "digi"},
+    "APZ247": {"model": "UPRS", "vendor": "NR0Q"},
+    "APZG??": {"vendor": "OH2GVE", "model": "aprsg", "class": "software", "os": "Linux/Unix"},
+    "APZMAJ": {"vendor": "M1MAJ", "model": "DeLorme inReach Tracker"},
+    "APZMDR": {"vendor": "Open Source", "model": "HaMDR", "class": "tracker", "os": "embedded"},
+    "APZTKP": {"vendor": "Nick Hanks, N0LP", "model": "TrackPoint", "class": "tracker", "os": "embedded"},
+    "APZWKR": {"vendor": "GM1WKR", "model": "NetSked", "class": "software"},
+    "APnnnD": {"vendor": "Painter Engineering", "model": "uSmartDigi D-Gate", "class": "dstar"},
+    "APnnnU": {"vendor": "Painter Engineering", "model": "uSmartDigi Digipeater", "class": "digi"},
+    "PSKAPR": {"vendor": "Open Source", "model": "PSKmail", "class": "software"},
+}
+
+
+COMMENT_DATA = {
+    "_ ": {"vendor": "Yaesu", "model": "VX-8", "class": "ht"},
+    "_\"": {"vendor": "Yaesu", "model": "FTM-350", "class": "rig"},
+    "_#": {"vendor": "Yaesu", "model": "VX-8G", "class": "ht"},
+    "_$": {"vendor": "Yaesu", "model": "FT1D", "class": "ht"},
+    "_(": {"vendor": "Yaesu", "model": "FT2D", "class": "ht"},
+    "_0": {"vendor": "Yaesu", "model": "FT3D", "class": "ht"},
+    "_3": {"vendor": "Yaesu", "model": "FT5D", "class": "ht"},
+    "_1": {"vendor": "Yaesu", "model": "FTM-300D", "class": "rig"},
+    "_)": {"vendor": "Yaesu", "model": "FTM-100D", "class": "rig"},
+    "_%": {"vendor": "Yaesu", "model": "FTM-400DR", "class": "rig"},
+    "_4": {"vendor": "Yaesu", "model": "FTM-500DR   ", "class": "rig"},    
+    "(5": {"vendor": "Anytone", "model": "D578UV", "class": "ht"},
+    "(8": {"vendor": "Anytone", "model": "D878UV", "class": "ht"},
+    "|3": {"vendor": "Byonics", "model": "TinyTrak3", "class": "tracker"},
+    "|4": {"vendor": "Byonics", "model": "TinyTrak4", "class": "tracker"},
+    "^v": {"vendor": "HinzTec", "model": "anyfrog"},
+    "*v": {"vendor": "KissOZ", "model": "Tracker", "class": "tracker"},
+}
+
 
 #Implementation for ack check with Message Retries #TODO
 def process_ack_id(from_callsign, ack_id):
@@ -66,7 +341,35 @@ def format_aprs_packet(callsign, message):
     spaces_after_sender = ' ' * max(0, 9 - sender_length) #1,9 - Changed 9-16
     aprs_packet_format = ':{}{}:{}'.format(callsign, spaces_after_sender, message)
     return aprs_packet_format
-    
+
+def process_tocall(tocall, comment):
+    print("Input:", tocall)
+
+    # Check for exact match in TOCALL_DATA
+    if tocall in TOCALL_DATA:
+        print("Exact match found.")
+        return TOCALL_DATA[tocall].get("model", tocall)
+
+    # Find the key with the maximum length of matching portion in TOCALL_DATA
+    best_match_tocall = max(
+        (key for key in TOCALL_DATA if key.count("?") > 0 and len(key) == len(tocall) and tocall.startswith(key[:-key.count("?")])),
+        key=lambda key: len(key[:-key.count("?")]),
+        default=None
+    )
+
+    if best_match_tocall:
+        print(f"Best match found with key in TOCALL_DATA: {best_match_tocall}")
+        return TOCALL_DATA[best_match_tocall].get("model", tocall)
+
+    # Check for matches in TOCALL_DATA based on the suffixes in comment
+    for suffix in COMMENT_DATA:
+        if comment.endswith(suffix):
+            print(f"Match found in TOCALL_DATA for suffix: {suffix}")
+            return COMMENT_DATA[suffix].get("model", tocall)
+
+    print("No match found. Returning the original input.")
+    return tocall  # Return the original tocall when no model is found
+
 
 # Encode KISS Call SSID Destination
 def encode_address(address, final):
@@ -123,6 +426,7 @@ def decode_address(encoded_data):
         address = call
     else:
         address = f"{call}-{ssid}"
+
     return address
 
 def decode_kiss_frame(kiss_frame):
@@ -211,6 +515,9 @@ class PacketRadioApp:
 
         self.message_id = 0  # Add this line to initialize message ID
 
+        # Create a dictionary to store last heard stations and their timestamps
+        self.last_heard_stations = {}
+
         # Keep track of sent messages and their retry count
         self.sent_messages = {}
         
@@ -234,8 +541,15 @@ class PacketRadioApp:
 
         # Use loaded settings for ip and port
         ip = self.settings.get("server_ip")
-        port = self.settings.get("server_port")
+        port = self.settings.get("server_port")  
         
+        # Create a "Last Heard" window (without making it visible)
+        self.last_heard_window = tk.Toplevel(self.root)
+        self.last_heard_window.title("Last Heard")
+        self.last_heard_window.withdraw()  # Hide the window initially     
+        
+        # Bind the protocol to handle the window close event
+        self.last_heard_window.protocol("WM_DELETE_WINDOW", self.on_last_heard_window_close)
 
         # Create a Text widget to display decoded packets
         self.text_widget = tk.Text(root, wrap="char", height=18, width=120)  # word wrap
@@ -245,9 +559,20 @@ class PacketRadioApp:
         self.messages_text_widget = tk.Text(root, wrap="char", height=7, width=120)
         self.messages_text_widget.grid(row=9, column=3, padx=10, pady=10, rowspan=5, sticky="nsew")
 
+        # Create a Text widget to display last heard stations
+        self.last_heard_text_widget = tk.Text(self.last_heard_window, wrap="char", height=10, width=30)
+        self.last_heard_text_widget.pack(padx=10, pady=10, expand=True, fill=tk.BOTH)
+
+        # Allow the Text widget to control the size of the Toplevel window
+        #self.last_heard_window.pack_propagate(True)
+        self.last_heard_window.geometry("275x200")  # Set your desired width and height
+
         # Configure the font for the text widgets above
         self.text_widget.configure(font=custom_font)
         self.messages_text_widget.configure(font=custom_font)
+        
+        # Configure the font for the text widget
+        self.last_heard_text_widget.configure(font=custom_font)
 
 
         # Configure row and column resizing the entire GUI
@@ -304,34 +629,18 @@ class PacketRadioApp:
         self.exit_button = tk.Button(root, width=10, text="Exit", command=self.exit_app)
         self.exit_button.grid(row=0, column=4, pady=5, padx=5, sticky="w")  # Center the button
 
+        #self.exit_button.place(x=1030, y=10)
+
+
+
         # Create a "Send Beacon" button
         #self.send_beacon_button = tk.Button(root, text="Send Beacon", command=self.send_beacon)
         #self.send_beacon_button.grid(row=4, column=2, pady=5, padx=5, sticky="w")
 
-        # Create a socket and connect to TNC
-        try:
-            self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self.socket.connect((self.settings.get("server_ip", ip), int(self.settings.get("server_port", port))))
-            print("logged in")
-
-            # Create a queue to communicate between threads
-            self.queue = queue.Queue()
-
-            # Start the thread to receive data
-            self.receive_thread = threading.Thread(target=self.receive_data)
-            self.receive_thread.daemon = True
-            self.receive_thread.start()
-
-            # Set up a callback to update the GUI
-            self.root.after(100, self.update_gui)
-
-        except ConnectionRefusedError as e:
-            print(f"Connection refused: {e}")
-            self.display_error_message(formatted_time, "Connection refused! Please check your settings!")
-
-
         # Create a queue to communicate between threads
         self.queue = queue.Queue()
+
+        self.connect_to_server()
 
         # Start the thread to receive data
         self.receive_thread = threading.Thread(target=self.receive_data)
@@ -355,9 +664,79 @@ class PacketRadioApp:
         self.menu_bar.add_cascade(label="Settings", menu=settings_menu)
         settings_menu.add_command(label="Configure", command=self.configure_settings)
 
+        # Create a Last Heard menu
+        last_heard_menu = tk.Menu(self.menu_bar, tearoff=0)
+        self.menu_bar.add_cascade(label="Last Heard", command=self.show_last_heard_window)
+
         # Create an About menu
         about_menu = tk.Menu(self.menu_bar, tearoff=0)
         self.menu_bar.add_cascade(label="About", command=self.show_about)
+     
+    def connect_to_server(self):
+        formatted_time = datetime.now().strftime("%H:%M:%S")
+        ip = self.settings.get("server_ip")
+        port = int(self.settings.get("server_port"))
+
+        try:
+            self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.socket.connect((self.settings.get("server_ip", ip), int(self.settings.get("server_port", port))))
+            print("logged in")
+
+            # Create a queue to communicate between threads
+            self.queue = queue.Queue()
+
+            # Start the thread to receive data
+            self.receive_thread = threading.Thread(target=self.receive_data)
+            self.receive_thread.daemon = True
+            self.receive_thread.start()
+
+            # Set up a callback to update the GUI
+            self.root.after(100, self.update_gui)
+
+        except ConnectionRefusedError as e:
+            print(f"Connection refused: {e}")
+            self.display_error_message(formatted_time, "Connection refused! Please check your settings!")
+     
+ 
+    def on_last_heard_window_close(self):
+        # Callback function to withdraw the "Last Heard" window when it's closed
+        self.last_heard_window.withdraw()
+
+
+    def update_last_heard(self, from_callsign, tocall, message_text):
+        # Update the last heard stations dictionary with the current timestamp
+        
+       # Call the process_tocall function with the tocall argument
+        tocall = process_tocall(tocall, message_text)
+        
+        formatted_time = datetime.now().strftime("%H:%M:%S")
+
+        # Check if the callsign is already in the dictionary
+        if from_callsign in self.last_heard_stations:
+            # Remove the existing entry
+            del self.last_heard_stations[from_callsign]
+
+        self.last_heard_stations[from_callsign] = (formatted_time, tocall)
+
+        # Update the display in the "Last Heard" window
+        self.update_last_heard_display()
+
+    def update_last_heard_display(self):
+        # Clear the existing content in the Text widget
+        self.last_heard_text_widget.delete(1.0, tk.END)
+
+        # Display the last heard stations and their timestamps
+        for callsign, (timestamp, tocall) in self.last_heard_stations.items():
+            entry = f"{timestamp}: {callsign} [{tocall}]\n"
+            self.last_heard_text_widget.insert(tk.END, entry)
+     
+        # Scroll to the bottom
+        self.last_heard_text_widget.see(tk.END)
+
+    def show_last_heard_window(self):
+        # Show the "Last Heard" window
+        self.last_heard_window.deiconify()
+        self.last_heard_window.lift()
 
     def focus_send_button(self, event):
         # Callback function to set focus on the "Send Message" button
@@ -485,7 +864,7 @@ class PacketRadioApp:
                 "tocall": "APOPYT",
                 "server_ip": "127.0.0.1",
                 "server_port": "8100",
-                "digi_path": "WIDE1-1"  # Add this line for the new setting
+                "digi_path": ""  # Add this line for the new setting
             }
 
 
@@ -619,6 +998,7 @@ class PacketRadioApp:
                 if len(parts) == 2 and parts[1].isdigit():
                     ack_id = parts[1]
                     process_ack_id(from_callsign, ack_id)
+                   # print("Immediate ACK processed from check_for_immediate_ack")
                     formatted_time = datetime.now().strftime("%H:%M:%S")                    
                     # Stop the retry timer for the corresponding message ID
                     self.stop_retry_timer(int(ack_id))
@@ -667,6 +1047,7 @@ class PacketRadioApp:
         callsign = self.callsign_var.get()
         tocall = self.tocall_var.get()
         path = self.digi_path_var.get()
+       
 
         # Process APRS message
         #print("Received raw APRS packet: {}".format(line.strip()))
@@ -675,13 +1056,30 @@ class PacketRadioApp:
         if len(parts) >= 2:
             from_callsign = parts[0].split('>')[0].strip()
             message_text = ':'.join(parts[1:]).strip()
+            print("first", message_text)
+            
+            #data between > and :
+            #destination = parts[0].split('>')[1].strip()
+            
+            #split at first comma. giving us tocall.
+            tocall = parts[0].split('>')[1].split(',')[0].strip()
+
+            print(tocall)
+        
+            # Update the "Last Heard" window with the from_callsign
+            self.update_last_heard(from_callsign, tocall, message_text)
             
             #Decide if TCPIP Message
             if message_text.startswith("}") and "TCPIP" in message_text:
                 #create new message text and new callsign
-                message_text = message_text.split("}", 1)[1].strip()                
+                message_text = message_text.split("}", 1)[1].strip()
+                print("second", message_text)
+                #new call and text
+                
                 from_callsign = message_text.split('>')[0].strip()
                 message_text = message_text.split(':', 1)[1].strip()
+                
+                print("third", from_callsign, message_text)
                 
                 if message_text.startswith(":{}".format(callsign)):
                     # Extract and process ACK ID if present
@@ -711,7 +1109,7 @@ class PacketRadioApp:
                         # Remove the first 11 characters from the message to exclude the "Callsign :" prefix
                         verbose_message = message_text[11:].split('{')[0].strip()
                         
-                        self.display_packet_messages(formatted_time, from_callsign, verbose_message, message_id)
+                        self.display_packet_messages(formatted_time, from_callsign+">"+callsign, verbose_message, message_id)
 
             #Not TCPIP
             elif message_text.startswith(":{}".format(callsign)):
@@ -721,13 +1119,14 @@ class PacketRadioApp:
                     if len(parts) == 2 and parts[1].isdigit():
                         ack_id = parts[1]
                         process_ack_id(from_callsign, ack_id)
+                        print("ack processed from parse packet")
                         self.display_packet(formatted_time, f"Ack Received for message {ack_id}.")
                 # End RXd ACK ID for MSG Retries
 
                 if "{" in message_text[-6:]:
                     message_id = message_text.split('{')[1]
                     ack_message = send_ack_message(from_callsign, message_id)  
-
+                    print("parsed", ack_message)
                     # Encode data using your custom encoding functions
                     ack_message = encode_ui_frame(callsign, tocall, ack_message, path)  # Updated function call
                     raw_packet = decode_kiss_frame(ack_message)
@@ -741,7 +1140,7 @@ class PacketRadioApp:
                     # Remove the first 11 characters from the message to exclude the "Callsign :" prefix
                     verbose_message = message_text[11:].split('{')[0].strip()
                     
-                    self.display_packet_messages(formatted_time, from_callsign, verbose_message, message_id)
+                    self.display_packet_messages(formatted_time, from_callsign+">"+callsign, verbose_message, message_id)
 
 
 
@@ -793,6 +1192,9 @@ class PacketRadioApp:
         # Encode data using your custom encoding functions
         encoded_data = encode_ui_frame(arg1, arg2, formatted_message + "{" + str(self.message_id), path)  # Use self.message_id
 
+        #fix path later on
+        #raw_packet = "{}>{}:{}".format(arg1, arg2, formatted_message + "{" + str(self.message_id))
+
         raw_packet = decode_kiss_frame(encoded_data)
 
         # Initialize formatted_time outside the try block
@@ -811,7 +1213,8 @@ class PacketRadioApp:
             self.display_packet(formatted_time, raw_packet)
             self.display_packet(formatted_time, "Message Sent successfully")
 
-            self.display_packet_messages(formatted_time, arg1, arg3, self.message_id)
+            #added to callsign
+            self.display_packet_messages(formatted_time, arg1+">"+to, arg3, self.message_id)
 
             # Add the sent message details to the sent_messages dictionary
             self.sent_messages[self.message_id] = {
@@ -886,6 +1289,9 @@ class PacketRadioApp:
                 # Resend the message
                 formatted_message = self.sent_messages[message_id]['formatted_message']
                 encoded_data = encode_ui_frame(self.callsign_var.get(), self.tocall_var.get(), formatted_message + "{" + str(message_id), path)
+                
+                #fix later to fit in path
+                #raw_packet = "{}>{}{}:{}".format(self.callsign_var.get(), self.tocall_var.get(), formatted_message + "{" + str(message_id)) 
                 
                 raw_packet = decode_kiss_frame(encoded_data)
                 
