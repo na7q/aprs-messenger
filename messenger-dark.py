@@ -779,11 +779,10 @@ class PacketRadioApp:
                 data = self.socket.recv(1024)
                 
                 if not data:
-                    # No data received within the timeout period
-                    print("No data received. Rechecking or performing other actions...")
-                    # Optionally, you can add a delay before rechecking
-                    time.sleep(1)
-                    continue  # Continue the loop without processing an empty frame
+                    print("Connection to TNC terminated. Reestablishing connection in 5 seconds...")
+                    time.sleep(5)  # Wait for 5 seconds before attempting to reconnect
+                    self.connect_to_server()
+                    frame_buffer = []  # Reset the frame_buffer after reconnecting
 
                 for byte in data:
                     frame_buffer.append(byte)
