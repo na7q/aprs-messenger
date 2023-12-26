@@ -9,11 +9,14 @@ import os
 import sys
 import webbrowser
 from tkinter import messagebox, font
+import aprslib
+import time
+import errno
+from tkinter import ttk
 
 #Default Font Family: Segoe UI
 #Default Font Size: 9
 #Default Font Weight: normal
-
 
 FONT_TYPE = 'Segoe UI'
 FONT_SIZE = 10
@@ -502,6 +505,8 @@ class PacketRadioApp:
     def __init__(self, root):
         self.root = root
         root.title("NA7Q Messenger")
+    
+        self.socket = None
 
         # Create a Font object with your desired font specifications
         custom_font = font.Font(family=FONT_TYPE, size=FONT_SIZE, weight=FONT_WEIGHT)
@@ -509,6 +514,9 @@ class PacketRadioApp:
         formatted_time = datetime.now().strftime("%H:%M:%S")
 
         self.displayed_message_ids = set()
+
+        self.previous_tos = {}  # Now it's an instance variable
+
 
         # Add the following variable to your class
         self.has_unacknowledged_messages = False
@@ -534,6 +542,8 @@ class PacketRadioApp:
         self.server_ip_var = tk.StringVar(value="")
         self.server_port_var = tk.StringVar(value="")
         self.digi_path_var = tk.StringVar(value="")
+        self.beacon_var = tk.StringVar(value="")
+        self.beacon_interval_var = tk.StringVar(value="")
 
 
         # Load settings from file
@@ -580,6 +590,8 @@ class PacketRadioApp:
             root.grid_rowconfigure(i, weight=1)  # Make rows expandable
             root.grid_columnconfigure(3, weight=1)  # Make column 3 expandable
 
+        previous_tos = {}  # Add your actual previously used values
+
 
         #to label
         self.to_label = tk.Label(root, text="To:")
@@ -591,6 +603,20 @@ class PacketRadioApp:
         #callsign to entry
         self.to_entry = tk.Entry(root, width=13, textvariable=self.to_var)  # Set textvariable
         self.to_entry.grid(row=19, column=3, pady=5, padx=5, sticky="w")  # Center the entry widget
+        # Create a Combobox widget
+        self.to_combobox = ttk.Combobox(root, values=previous_tos, textvariable=self.to_var)
+        # Set the default value to an empty string
+        self.to_combobox.set("")
+        # Place the Combobox widget in the desired location
+        self.to_combobox.grid(row=19, column=3, pady=5, padx=5, sticky="w")
+
+        # Bind a callback function to handle selection changes
+        self.to_combobox.bind("<<ComboboxSelected>>", self.on_to_combobox_selected)
+
+ 
+
+
+
 
         #message label
         self.message_label = tk.Label(root, text="Msg:")
@@ -600,6 +626,12 @@ class PacketRadioApp:
         self.message_entry = tk.Entry(root, width=160, textvariable=self.message_var)  # Set textvariable
         self.message_entry.grid(row=20, column=3, pady=5, padx=5, sticky="w", columnspan=2)  # Center the entry widget
 
+        # Bind the callback function to both entry widgets
+        self.message_entry.bind("<KeyRelease>", self.check_message_entry)
+        self.to_entry.bind("<KeyRelease>", self.check_message_entry)
+
+        # Bind the <Tab> key to the callback function
+        self.to_entry.bind("<Tab>", self.focus_message_entry)
 
         # Create a "Send Message" button
         self.send_message_button = tk.Button(root, text="Send Message", command=self.send_message, state=tk.DISABLED)
@@ -607,6 +639,8 @@ class PacketRadioApp:
 
         # Bind the <Tab> key to the callback function
         self.message_entry.bind("<Tab>", self.focus_send_button)
+        # Bind the <Return> key to the callback function
+        self.message_entry.bind("<Return>", self.send_message_on_enter)
 
         # Create a "Cancel Retry" button
         self.cancel_retry_button = tk.Button(root, text="Abort Retries", command=self.cancel_retry_timer)
@@ -624,6 +658,9 @@ class PacketRadioApp:
         self.server_ip_var = tk.StringVar(value=self.settings.get("server_ip", ""))
         self.server_port_var = tk.StringVar(value=self.settings.get("server_port", ""))
         self.digi_path_var = tk.StringVar(value=self.settings.get("digi_path", ""))
+        self.beacon_var = tk.StringVar(value=self.settings.get("beacon", ""))
+        self.beacon_interval_var = tk.StringVar(value=self.settings.get("beacon_interval", ""))
+
 
         # Create an Exit button and place it at coordinates (x=10, y=10)
         self.exit_button = tk.Button(root, width=10, text="Exit", command=self.exit_app)
@@ -634,18 +671,16 @@ class PacketRadioApp:
 
 
         # Create a "Send Beacon" button
-        #self.send_beacon_button = tk.Button(root, text="Send Beacon", command=self.send_beacon)
-        #self.send_beacon_button.grid(row=4, column=2, pady=5, padx=5, sticky="w")
+        self.send_beacon_button = tk.Button(root, text="Send Beacon", command=self.send_beacon)
+        self.send_beacon_button.grid(row=3, column=4, pady=5, padx=5, sticky="w")
 
         # Create a queue to communicate between threads
         self.queue = queue.Queue()
 
-        self.connect_to_server()
-
-        # Start the thread to receive data
-        self.receive_thread = threading.Thread(target=self.receive_data)
-        self.receive_thread.daemon = True
-        self.receive_thread.start()
+        # Start the thread to connect to the server
+        self.connect_thread = threading.Thread(target=self.connect_to_server)
+        self.connect_thread.daemon = True
+        self.connect_thread.start()
 
         # Set up a callback to update the GUI
         self.root.after(100, self.update_gui)
@@ -671,33 +706,103 @@ class PacketRadioApp:
         # Create an About menu
         about_menu = tk.Menu(self.menu_bar, tearoff=0)
         self.menu_bar.add_cascade(label="About", command=self.show_about)
-     
+    
+        self.send_beacon_auto()
+
+    def focus_message_entry(self, event):
+        # Change the focus to the message_entry widget
+        self.message_entry.focus_set()
+
+    # Callback function to handle selection changes in the Combobox
+    def on_to_combobox_selected(self, event):
+        selected_to = self.to_combobox.get()
+
+    # Add the following method to your class
+    def send_message_on_enter(self, event):
+        # Callback function to send a message when the Enter key is pressed
+        if self.message_var.get().strip():
+            # Only send the message if the message entry is not empty
+            self.send_message()
+        
     def connect_to_server(self):
         formatted_time = datetime.now().strftime("%H:%M:%S")
         ip = self.settings.get("server_ip")
         port = int(self.settings.get("server_port"))
 
-        try:
-            self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self.socket.connect((self.settings.get("server_ip", ip), int(self.settings.get("server_port", port))))
-            print("logged in")
 
-            # Create a queue to communicate between threads
-            self.queue = queue.Queue()
+        while True:
+            try:
+                formatted_time = datetime.now().strftime("%H:%M:%S")
 
-            # Start the thread to receive data
-            self.receive_thread = threading.Thread(target=self.receive_data)
-            self.receive_thread.daemon = True
-            self.receive_thread.start()
+                # Initialize the socket and connect to the TNC
+                self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                self.socket.connect((self.settings.get("server_ip", ip), int(self.settings.get("server_port", port))))
+                print("Connected to TNC")
 
-            # Set up a callback to update the GUI
-            self.root.after(100, self.update_gui)
+                self.root.after(0, lambda: self.display_packet(formatted_time, "Connected."))
 
-        except ConnectionRefusedError as e:
-            print(f"Connection refused: {e}")
-            self.display_error_message(formatted_time, "Connection refused! Please check your settings!")
-     
- 
+
+                # Create a queue to communicate between threads
+                self.queue = queue.Queue()
+
+                # Set up a callback to update the GUI
+                self.root.after(100, self.update_gui)
+
+                self.receive_data()
+
+
+                # If the connection was successful, break out of the loop
+                break
+
+            except socket.error as e:
+                if e.errno == errno.ECONNREFUSED:
+                    print("Connection to TNC refused. Retrying in 10 seconds...")
+                    self.root.after(0, lambda: self.display_packet(formatted_time, "Connection to TNC refused. Retrying..."))
+
+                    time.sleep(10)  # Wait for 10 seconds before attempting to reconnect
+                else:
+                    print("Socket error:", str(e))
+                    time.sleep(1)  # Wait for a while before attempting to reconnect
+
+            except Exception as e:
+                print("Error connecting to TNC: {}".format(e))
+                time.sleep(1)  # Wait for a while before attempting to reconnect
+
+            
+    # TNC KISS Frames Received from RF
+    def receive_data(self):
+        frame_buffer = []
+
+        while True:
+            try:
+                # Receive data with a timeout of 1 second
+                data = self.socket.recv(1024)
+                
+                if not data:
+                    # No data received within the timeout period
+                    print("No data received. Rechecking or performing other actions...")
+                    # Optionally, you can add a delay before rechecking
+                    time.sleep(1)
+                    continue  # Continue the loop without processing an empty frame
+
+                for byte in data:
+                    frame_buffer.append(byte)
+                    if len(frame_buffer) > 1 and byte == KISS_FEND:
+                        hex_data = ' '.join([hex(b)[2:].zfill(2) for b in frame_buffer])
+                        formatted_time = datetime.now().strftime("%H:%M:%S")
+                        decoded_packet = decode_kiss_frame(frame_buffer)
+                        if decoded_packet:
+                            self.parse_packet(decoded_packet)
+                            self.check_for_immediate_ack(decoded_packet)
+                        frame_buffer = []
+
+            except Exception as e:
+                print(f"Error in receive_frames: {str(e)}")
+                self.connect_to_server()  # Reconnect to the server
+                print("Reestablished connection to TNC.")
+                frame_buffer = []  # Reset the frame_buffer after reconnecting
+
+
     def on_last_heard_window_close(self):
         # Callback function to withdraw the "Last Heard" window when it's closed
         self.last_heard_window.withdraw()
@@ -722,6 +827,8 @@ class PacketRadioApp:
         self.update_last_heard_display()
 
     def update_last_heard_display(self):
+        self.last_heard_text_widget.config(state="normal")
+
         # Clear the existing content in the Text widget
         self.last_heard_text_widget.delete(1.0, tk.END)
 
@@ -730,7 +837,8 @@ class PacketRadioApp:
             entry = f"{timestamp}: {callsign} [{tocall}]\n"
             self.last_heard_text_widget.insert(tk.END, entry)
      
-        # Scroll to the bottom
+        # Disable editing and scroll to the bottom
+        self.last_heard_text_widget.config(state="disabled")
         self.last_heard_text_widget.see(tk.END)
 
     def show_last_heard_window(self):
@@ -742,10 +850,6 @@ class PacketRadioApp:
         # Callback function to set focus on the "Send Message" button
         self.send_message_button.focus_set()
         return "break"  # Prevent the default behavior of the <Tab> key
-
-    def display_error_message(self, formatted_message, message):
-        self.text_widget.insert(tk.END, f"{formatted_message}: {message}\n")
-        self.text_widget.see(tk.END)  # Scroll to the end of the text
 
     def restart_app(self):
         python = sys.executable
@@ -769,16 +873,40 @@ class PacketRadioApp:
         port_label = tk.Label(settings_window, text="Server Port")
         port_label.grid(row=3, column=0, pady=5, padx=5, sticky="e")
 
+        # New label and entry for digi_path
+        digi_path_label = tk.Label(settings_window, text="Digi Path 1")
+        digi_path_label.grid(row=4, column=0, pady=5, padx=5, sticky="e")
+
+        beacon_label = tk.Label(settings_window, text="Beacon")
+        beacon_label.grid(row=5, column=0, pady=5, padx=5, sticky="e")
+
+        beacon_interval_label = tk.Label(settings_window, text="Beacon Interval")
+        beacon_interval_label.grid(row=6, column=0, pady=5, padx=5, sticky="e")
+
+
         callsign_var = tk.StringVar(value=self.callsign_var.get())
         tocall_var = tk.StringVar(value=self.tocall_var.get())
         ip_var = tk.StringVar(value=self.settings.get("server_ip", ""))
         port_var = tk.StringVar(value=self.settings.get("server_port", ""))
+        digi_path_var = tk.StringVar(value=self.settings.get("digi_path", ""))
+        beacon_var = tk.StringVar(value=self.settings.get("beacon", ""))
+        beacon_interval_var = tk.StringVar(value=self.settings.get("beacon_interval", ""))
+
+        callsign_var.trace_add("write", lambda *args: callsign_var.set(callsign_var.get().upper()))
+        tocall_var.trace_add("write", lambda *args: tocall_var.set(tocall_var.get().upper()))
+        # Add this line to create a trace on the StringVar
+        beacon_interval_var.trace_add("write", lambda *args: beacon_interval_var.set(''.join(c for c in beacon_interval_var.get() if c.isdigit())))
+        digi_path_var.trace_add("write", lambda *args: digi_path_var.set(digi_path_var.get().upper()))
+
 
         callsign_entry = tk.Entry(settings_window, width=30, textvariable=callsign_var)
         callsign_entry.grid(row=0, column=1, pady=5, padx=5, sticky="w")
 
         tocall_entry = tk.Entry(settings_window, width=30, textvariable=tocall_var)
         tocall_entry.grid(row=1, column=1, pady=5, padx=5, sticky="w")
+        
+        #Disable TOCALL ENTRY
+        tocall_entry.config(state="disabled")  # Set the state only for this entry
 
         ip_entry = tk.Entry(settings_window, width=30, textvariable=ip_var)
         ip_entry.grid(row=2, column=1, pady=5, padx=5, sticky="w")
@@ -786,19 +914,21 @@ class PacketRadioApp:
         port_entry = tk.Entry(settings_window, width=30, textvariable=port_var)
         port_entry.grid(row=3, column=1, pady=5, padx=5, sticky="w")
 
-        # New label and entry for digi_path
-        digi_path_label = tk.Label(settings_window, text="Digi Path 1")
-        digi_path_label.grid(row=4, column=0, pady=5, padx=5, sticky="e")
-
-        digi_path_var = tk.StringVar(value=self.settings.get("digi_path", ""))
         digi_path_entry = tk.Entry(settings_window, width=30, textvariable=digi_path_var)
         digi_path_entry.grid(row=4, column=1, pady=5, padx=5, sticky="w")
 
-        # Create a Save button to save the settings to a file
-        save_button = tk.Button(settings_window, text="Save", command=lambda: self.save_settings(callsign_var.get(), tocall_var.get(), ip_var.get(), port_var.get(), digi_path_var.get(), settings_window))
-        save_button.grid(row=5, column=1, pady=10)
+        beacon_entry = tk.Entry(settings_window, width=30, textvariable=beacon_var)
+        beacon_entry.grid(row=5, column=1, pady=5, padx=5, sticky="w")
 
-    def save_settings(self, callsign, tocall, server_ip, server_port, digi_path, settings_window):
+        beacon_interval_entry = tk.Entry(settings_window, width=30, textvariable=beacon_interval_var)
+        beacon_interval_entry.grid(row=6, column=1, pady=5, padx=5, sticky="w")
+
+
+        # Create a Save button to save the settings to a file
+        save_button = tk.Button(settings_window, text="Save", command=lambda: self.save_settings(callsign_var.get(), tocall_var.get(), ip_var.get(), port_var.get(), digi_path_var.get(), beacon_var.get(), beacon_interval_var.get(), settings_window))
+        save_button.grid(row=8, column=1, pady=10)
+
+    def save_settings(self, callsign, tocall, server_ip, server_port, digi_path, beacon, beacon_interval, settings_window):
         # Convert inputs to uppercase
         callsign = callsign.upper()
         tocall = tocall.upper()
@@ -812,6 +942,9 @@ class PacketRadioApp:
             file.write(f"SERVER_IP={server_ip}\n")
             file.write(f"SERVER_PORT={server_port}\n")
             file.write(f"DIGI_PATH={digi_path}\n")  # Add this line for the new setting
+            file.write(f"BEACON={beacon}\n")  # Add this line for the new setting
+            file.write(f"BEACON_INTERVAL={beacon_interval}\n")  # Add this line for the new setting
+
 
         # Update the application's variables
         self.callsign_var.set(callsign)
@@ -819,6 +952,8 @@ class PacketRadioApp:
         self.server_ip_var.set(server_ip)
         self.server_port_var.set(server_port)
         self.digi_path_var.set(digi_path)  # Add this line for the new setting
+        self.beacon_var.set(beacon)
+        self.beacon_interval_var.set(beacon_interval)
 
         # Close the settings window
         settings_window.destroy()
@@ -839,6 +974,8 @@ class PacketRadioApp:
             server_port = lines[3].strip().split("=")[1]
             # Extract DIGI_PATH value
             digi_path = lines[4].strip().split("=", 1)[1] or None
+            beacon = lines[5].strip().split("=", 1)[1] or ">NA7Q Messenger" #Return empty value
+            beacon_interval = lines[6].strip().split("=", 1)[1] or 0 #Return 0
 
 
             # Update the application's variables
@@ -847,6 +984,8 @@ class PacketRadioApp:
             self.server_ip_var.set(server_ip)
             self.server_port_var.set(server_port)
             self.digi_path_var.set(digi_path)
+            self.beacon_var.set(beacon)
+            self.beacon_interval_var.set(beacon_interval)
             
 
             return {
@@ -854,7 +993,11 @@ class PacketRadioApp:
                 "tocall": tocall,
                 "server_ip": server_ip,
                 "server_port": server_port,
-                "digi_path": digi_path  # Add this line for the new setting
+                "digi_path": digi_path,  # Add this line for the new setting
+                "beacon": beacon,
+                "beacon_interval": beacon_interval
+                
+
             }
             
         except FileNotFoundError:
@@ -864,7 +1007,10 @@ class PacketRadioApp:
                 "tocall": "APOPYT",
                 "server_ip": "127.0.0.1",
                 "server_port": "8100",
-                "digi_path": ""  # Add this line for the new setting
+                "digi_path": "",  # Add this line for the new setting
+                "beacon": ">NA7Q Messenger",
+                "beacon_interval": "0"
+                
             }
 
 
@@ -877,23 +1023,73 @@ class PacketRadioApp:
             self.tocall_var.set(default_settings["tocall"])
             self.server_ip_var.set(default_settings["server_ip"])
             self.server_port_var.set(default_settings["server_port"])
+            self.digi_path_var.set(default_settings["digi_path"])
+            self.beacon_var.set(default_settings["beacon"])
+            self.beacon_interval_var.set(default_settings["beacon_interval"])
+
 
             return default_settings
         except (IndexError, ValueError) as e:
             # Handle other potential issues with the file content
-            messagebox.showerror("Error", f"Error loading settings: {e}")
+            #messagebox.showerror("Error", f"Error loading settings: {e}")
             return {}
 
             
     def send_beacon(self):
+    
+            # Get values from entry widgets
+            arg1 = self.callsign_var.get()
+            arg2 = self.tocall_var.get()
+            arg3 = self.beacon_var.get()
+            path = self.digi_path_var.get()
+
+            # Encode data using your custom encoding functions
+            encoded_data = encode_ui_frame(arg1, arg2, arg3, path)  # Updated function call
+
+            raw_packet = decode_kiss_frame(encoded_data)
+
+
+            # Initialize formatted_time outside the try block
+            formatted_time = datetime.now().strftime("%H:%M:%S")
+
+            try:
+                # Send the encoded data to the server
+                self.socket.send(encoded_data)
+
+                # Display success message in the GUI
+                self.display_packet(formatted_time, raw_packet)
+
+                # Display success message in the GUI
+                self.display_packet(formatted_time, "Beacon Sent successfully")
+
+            except Exception as e:
+                # Handle errors if sending fails
+                error_message = f"Failed to send beacon: {str(e)}"
+                self.display_packet(formatted_time, error_message)
+
+# Inside your class definition
+
+    def send_beacon_auto(self):
+        # Check if the interval is 0, and if so, break out of the loop
+        if self.beacon_interval_var.get() == "0":
+            return
+
+        # Check if the socket is ready
+        if not self.socket or self.socket.fileno() == -1:
+            # Wait for the socket to be open
+            self.root.after(1000, self.send_beacon_auto)
+            return
+
         # Get values from entry widgets
         arg1 = self.callsign_var.get()
         arg2 = self.tocall_var.get()
-        arg3 = self.message_var.get()
+        arg3 = self.beacon_var.get()
         path = self.digi_path_var.get()
 
         # Encode data using your custom encoding functions
         encoded_data = encode_ui_frame(arg1, arg2, arg3, path)  # Updated function call
+
+        raw_packet = decode_kiss_frame(encoded_data)
 
         # Initialize formatted_time outside the try block
         formatted_time = datetime.now().strftime("%H:%M:%S")
@@ -903,23 +1099,25 @@ class PacketRadioApp:
             self.socket.send(encoded_data)
 
             # Display success message in the GUI
+            self.display_packet(formatted_time, raw_packet)
+
+            # Display success message in the GUI
             self.display_packet(formatted_time, "Beacon Sent successfully")
-
-            self.message_var.set("")  # Clear the message string
-
 
         except Exception as e:
             # Handle errors if sending fails
             error_message = f"Failed to send beacon: {str(e)}"
             self.display_packet(formatted_time, error_message)
 
-
+        # Schedule the next call to send_beacon_auto after the specified interval
+        self.root.after(int(float(self.beacon_interval_var.get()) * 1000), self.send_beacon_auto)
 
     def exit_app(self):
         # Cleanly close the socket and exit the application
         self.socket.close()
         self.root.destroy()
-        
+        sys.exit()
+
     def show_about(self):
         about_text = "NA7Q APRS Messenger\nVersion 1.0\n\n" \
                      "Support me on Patreon:\n" \
@@ -959,6 +1157,9 @@ class PacketRadioApp:
         about_message.tag_add("link", start_index, end_index)
         about_message.tag_bind("link", "<Button-1>", lambda e: self.open_link())
 
+        # Disable the Text widget
+        about_message.config(state="disabled")
+
     def open_link(self):
         webbrowser.open("https://www.patreon.com/NA7Q/membership")
 
@@ -967,33 +1168,17 @@ class PacketRadioApp:
         message_window = tk.Toplevel(self.root)
         message_window.title("Send Message")
 
-
-    def receive_data(self):
-        while True:
-            data = self.socket.recv(1024)
-            if not data:
-                break
-
-            for byte in data:
-                frame_buffer.append(byte)
-                if len(frame_buffer) > 1 and byte == KISS_FEND:
-                    hex_data = ' '.join([hex(b)[2:].zfill(2) for b in frame_buffer])
-                    formatted_time = datetime.now().strftime("%H:%M:%S")
-                    decoded_packet = decode_kiss_frame(frame_buffer)
-                    if decoded_packet:
-                        self.parse_packet(decoded_packet)
-                        # Check for ACK immediately when a new packet is received
-                        self.check_for_immediate_ack(decoded_packet)
-                    frame_buffer.clear()
-
-    # Add the following method to your class
+    #FIX ACK TO ONLY LOOK FOR OUR CALLSIGN!!!
     def check_for_immediate_ack(self, packet):
+        callsign = self.callsign_var.get()
         parts = packet.strip().split(':')
         if len(parts) >= 2:
             from_callsign = parts[0].split('>')[0].strip()
             message_text = ':'.join(parts[1:]).strip()
 
-            if "ack" in message_text:
+            if "ack" in message_text and callsign in message_text:
+
+            #if "ack" in message_text:
                 parts = message_text.split("ack", 1)
                 if len(parts) == 2 and parts[1].isdigit():
                     ack_id = parts[1]
@@ -1041,6 +1226,22 @@ class PacketRadioApp:
         # Set up the callback to run after 100 milliseconds
         self.root.after(100, self.update_gui)
 
+
+    def aprslib_parse(self, line):
+        try:
+            aprs_packet = aprslib.parse(line.strip())
+            lat = aprs_packet['latitude']
+            lon = aprs_packet['longitude']
+            from_callsign = aprs_packet['from']
+
+            print(lat, lon)
+            print("From Callsign:", from_callsign)
+
+        except Exception as e:
+            # Handle the exception (or ignore it, if no handling is needed)
+            print("Error while parsing APRS packet:", e)
+            
+            
     def parse_packet(self, line):
         # Initialize formatted_time outside the try block
         formatted_time = datetime.now().strftime("%H:%M:%S")
@@ -1048,6 +1249,7 @@ class PacketRadioApp:
         tocall = self.tocall_var.get()
         path = self.digi_path_var.get()
        
+        self.aprslib_parse(line)
 
         # Process APRS message
         #print("Received raw APRS packet: {}".format(line.strip()))
@@ -1062,12 +1264,12 @@ class PacketRadioApp:
             #destination = parts[0].split('>')[1].strip()
             
             #split at first comma. giving us tocall.
-            tocall = parts[0].split('>')[1].split(',')[0].strip()
+            from_tocall = parts[0].split('>')[1].split(',')[0].strip()
 
-            print(tocall)
+            print(from_tocall)
         
             # Update the "Last Heard" window with the from_callsign
-            self.update_last_heard(from_callsign, tocall, message_text)
+            self.update_last_heard(from_callsign, from_tocall, message_text)
             
             #Decide if TCPIP Message
             if message_text.startswith("}") and "TCPIP" in message_text:
@@ -1109,7 +1311,13 @@ class PacketRadioApp:
                         # Remove the first 11 characters from the message to exclude the "Callsign :" prefix
                         verbose_message = message_text[11:].split('{')[0].strip()
                         
-                        self.display_packet_messages(formatted_time, from_callsign+">"+callsign, verbose_message, message_id)
+                        self.display_packet_messages(formatted_time, from_callsign, callsign, verbose_message, message_id)
+                                            
+                        # Update the values in the Combobox
+                        if from_callsign not in self.previous_tos:
+                            self.previous_tos[from_callsign] = True
+                            self.to_combobox['values'] = list(self.previous_tos.keys())
+
 
             #Not TCPIP
             elif message_text.startswith(":{}".format(callsign)):
@@ -1140,7 +1348,12 @@ class PacketRadioApp:
                     # Remove the first 11 characters from the message to exclude the "Callsign :" prefix
                     verbose_message = message_text[11:].split('{')[0].strip()
                     
-                    self.display_packet_messages(formatted_time, from_callsign+">"+callsign, verbose_message, message_id)
+                    self.display_packet_messages(formatted_time, from_callsign, callsign, verbose_message, message_id)
+
+                    # Update the values in the Combobox
+                    if from_callsign not in self.previous_tos:
+                        self.previous_tos[from_callsign] = True
+                        self.to_combobox['values'] = list(self.previous_tos.keys())
 
 
 
@@ -1151,29 +1364,35 @@ class PacketRadioApp:
         self.text_widget.config(state="disabled")
         self.text_widget.see(tk.END)
 
-    def display_packet_messages(self, formatted_time, from_callsign, message_text, message_id):
+    def display_packet_messages(self, formatted_time, from_callsign, callsign, message_text, message_id):
         # Check if the message ID has already been displayed
-        if message_id not in self.displayed_message_ids:
+        message_tuple = (from_callsign, message_id, message_text)
+        if message_tuple not in self.displayed_message_ids:
             # Display the message in the "Messages" window
             # (Assuming self.messages_text_widget is your widget for displaying messages)
             self.messages_text_widget.config(state="normal")
-            self.messages_text_widget.insert(tk.END, f"{formatted_time}: [{from_callsign}] {message_text} [ID:{message_id}]\n")
+            self.messages_text_widget.insert(tk.END, f"{formatted_time}: [{from_callsign}>{callsign}] {message_text} [ID:{message_id}]\n")
             self.messages_text_widget.config(state="disabled")
             self.messages_text_widget.see(tk.END)
 
             # Add the message ID to the set of displayed message IDs
-            self.displayed_message_ids.add(message_id)
+            self.displayed_message_ids.add(message_tuple)
+
+            print(f"DEBUG: Message displayed - {message_tuple}")
+        else:
+            print(f"DEBUG: Message already displayed - {message_tuple}")
 
     def check_message_entry(self, *args):
         # Callback function to check the message entry and enable/disable the button
         message_text = self.message_var.get().strip()
-        if message_text:
-            # If there is text in the message entry, enable the button
+        to_entry_text = self.to_var.get().strip()
+
+        if message_text and to_entry_text:
+            # If there is text in both the message entry and to_entry, enable the button
             self.send_message_button.config(state=tk.NORMAL)
         else:
-            # If the message entry is empty, disable the button
+            # If either the message entry or to_entry is empty, disable the button
             self.send_message_button.config(state=tk.DISABLED)
-
 
     def send_message(self):
         global TIMER_START
@@ -1183,6 +1402,11 @@ class PacketRadioApp:
         arg3 = self.message_var.get()  # Use the new entry for sending messages
         to = self.to_var.get()  # Use the new entry for sending messages
         path = self.digi_path_var.get()  # Use the new entry for sending messages
+
+        # Update the values in the Combobox
+        if to not in self.previous_tos:
+            self.previous_tos[to] = True
+            self.to_combobox['values'] = list(self.previous_tos.keys())
 
         self.message_id += 1  # Increment the message ID
 
@@ -1214,7 +1438,7 @@ class PacketRadioApp:
             self.display_packet(formatted_time, "Message Sent successfully")
 
             #added to callsign
-            self.display_packet_messages(formatted_time, arg1+">"+to, arg3, self.message_id)
+            self.display_packet_messages(formatted_time, arg1, to, arg3, self.message_id)
 
             # Add the sent message details to the sent_messages dictionary
             self.sent_messages[self.message_id] = {
