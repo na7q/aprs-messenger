@@ -1,12 +1,12 @@
-Bigfoot APRS Messenger by NA7Q. 
+Bigfoot APRS Messenger by NA7Q. <br>
 Check out the Bigfoot Amateur Radio Club WA7BF
-
-pip install aprslib
-pin install requests
-pip install flask
-pip install socketio (for mapping in future release)
-pip install flask-socketio (for mapping in future release)
-
+<br><br>
+pip install aprslib<br>
+pin install requests<br>
+pip install flask<br>
+pip install socketio (for mapping in future release)<br>
+pip install flask-socketio (for mapping in future release)<br>
+<br><br><br>
 ![image](https://github.com/na7q/aprs-messenger/assets/1294292/1dc05d87-989f-4d42-ad0f-243707995826)
 
 
