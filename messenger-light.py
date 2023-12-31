@@ -473,7 +473,20 @@ def decode_kiss_frame(kiss_frame):
                                 path_chunk = paths[i:i+7]
                                 path_address = decode_address(path_chunk)
 
-                                if path_chunk[-1] in [0xE0, 0xE1, 0xE2, 0xE3, 0xE4, 0xE5, 0xE6, 0xE7, 0xE8, 0xE9]:
+                                digi = False  # Initialize digi to False
+
+                                # 7th byte carries SSID or digi:
+                                seven_chunk = path_chunk[6] & 0xFF
+                                                        
+                                #print(f"Path (Hex): {' '.join([hex(b)[2:].zfill(2) for b in path_chunk])}")
+
+                                if seven_chunk & 0x80:
+                                    digi = True
+
+                                print(digi)
+
+                                # Check if digi is True, then append '*' to the path_address_with_asterisk
+                                if digi:
                                     path_address_with_asterisk = f"{path_address}*"
                                 else:
                                     path_address_with_asterisk = path_address
@@ -1061,6 +1074,8 @@ class PacketRadioApp:
                 # Display success message in the GUI
                 self.display_packet(formatted_time, "Beacon Sent successfully")
 
+                self.aprslib_parse(raw_packet)
+
             except Exception as e:
                 # Handle errors if sending fails
                 error_message = f"Failed to send beacon: {str(e)}"
@@ -1102,6 +1117,9 @@ class PacketRadioApp:
 
             # Display success message in the GUI
             self.display_packet(formatted_time, "Beacon Sent successfully")
+            
+            self.aprslib_parse(raw_packet)
+
 
         except Exception as e:
             # Handle errors if sending fails
@@ -1229,16 +1247,21 @@ class PacketRadioApp:
     def aprslib_parse(self, line):
         try:
             aprs_packet = aprslib.parse(line.strip())
-            lat = aprs_packet['latitude']
-            lon = aprs_packet['longitude']
-            from_callsign = aprs_packet['from']
+            print(aprs_packet)
+            print("line", line)
 
+            # Check if lat or lon is None, and set them to "null"
+            lat = str(aprs_packet.get('latitude', 'unknown'))
+            lon = str(aprs_packet.get('longitude', 'unknown'))
+            from_callsign = str(aprs_packet.get('from', 'unknown'))
+            
             print(lat, lon)
             print("From Callsign:", from_callsign)
 
         except Exception as e:
             # Handle the exception (or ignore it, if no handling is needed)
             print("Error while parsing APRS packet:", e)
+            # Still send the line data to the web in case of an exception
             
             
     def parse_packet(self, line):
@@ -1439,6 +1462,10 @@ class PacketRadioApp:
             #added to callsign
             self.display_packet_messages(formatted_time, arg1, to, arg3, self.message_id)
 
+            #added to update web live feed
+            self.aprslib_parse(raw_packet)
+
+
             # Add the sent message details to the sent_messages dictionary
             self.sent_messages[self.message_id] = {
                 'formatted_message': formatted_message,
@@ -1524,6 +1551,10 @@ class PacketRadioApp:
                 self.display_packet(formatted_time, raw_packet)
                 self.display_packet(formatted_time, f"Retry {message_retry_count} Sent successfully (Interval: {retry_interval} seconds)")
 
+                #added to update web live feed
+                self.aprslib_parse(raw_packet)
+
+
                 # Restart the timer for the next retry
                 self.sent_messages[message_id]['timer'] = threading.Timer(retry_interval, self.retry_message, args=[message_id])
                 self.sent_messages[message_id]['timer'].start()
@@ -1550,6 +1581,8 @@ class PacketRadioApp:
         message_id_str = str(message_id)
         
         return message_id_str in ack_set
+
+
 
 # Create the main window
 root = tk.Tk()
