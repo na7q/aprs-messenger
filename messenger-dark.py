@@ -13,9 +13,6 @@ import aprslib
 import time
 import errno
 from tkinter import ttk
-import socketio
-from flask import Flask, render_template
-from flask_socketio import SocketIO
 
 #Default Font Family: Segoe UI
 #Default Font Size: 9
@@ -318,29 +315,6 @@ COMMENT_DATA = {
     "*v": {"vendor": "KissOZ", "model": "Tracker", "class": "tracker"},
 }
 
-def run_flask_app():
-
-    try:
-        app = Flask(__name__)
-        socketio = SocketIO(app, cors_allowed_origins="*")
-
-        @app.route('/')
-        def index():
-            return render_template('map.html')
-
-        @socketio.on('update_map')
-        def handle_update(data):
-            print(f"Received data from Python script: {data}")
-            socketio.emit('update_map', data)
-
-        def open_browser():
-            #time.sleep(2)
-            webbrowser.open('http://127.0.0.1:5000')
-
-        socketio.start_background_task(open_browser)
-        socketio.run(app, debug=False, use_reloader=False)
-    except Exception as e:
-        print(f"Error starting Flask app: {e}")
 
 #Implementation for ack check with Message Retries #TODO
 def process_ack_id(from_callsign, ack_id):
@@ -748,51 +722,6 @@ class PacketRadioApp:
         self.menu_bar.add_cascade(label="About", command=self.show_about)
     
         self.send_beacon_auto()
-
-        # Comment out the Flask thread part
-        flask_thread = threading.Thread(target=run_flask_app)
-        flask_thread.daemon = True
-        flask_thread.start()
-        
-        # Additional initialization for socket.io
-        self.sio = socketio.Client()
-        self.sio.on('connect', self.on_socket_connect)
-        self.sio.on('disconnect', self.on_socket_disconnect)
-        
-        # Start a thread to run the socket.io client in the background
-        self.socket_io_thread = threading.Thread(target=self.connect_socket_io)
-        self.socket_io_thread.daemon = True
-        self.socket_io_thread.start()
-
-    
-    def on_socket_connect(self):
-        print("Connected to server")
-
-    def on_socket_disconnect(self):
-        print("Disconnected from server")
-
-    def connect_socket_io(self):
-        try:
-            self.sio.connect('http://127.0.0.1:5000')  # Change the address if your server is running on a different host or port
-            self.sio.wait()  # This blocks until the connection is closed
-
-        except Exception as e:
-            print(f"Error connecting to mapping web server: {e}")
-        
-        
-    def send_to_web(self, lat, lon, callsign, line):
-        try:
-            formatted_time = datetime.now().strftime("%H:%M:%S")
-
-            test_data = {'lat': lat, 'lon': lon, 'callsign': callsign, 'raw_packet': line, 'formatted_time': formatted_time}
-            print("send to web", test_data)
-
-            # Emit test data to the socket.io server
-            self.sio.emit('update_map', test_data)
-            print(f"Test data sent to the server: {test_data}")
-
-        except Exception as e:
-            print(f"Error sending test data: {e}")
 
     def focus_message_entry(self, event):
         # Change the focus to the message_entry widget
@@ -1327,7 +1256,6 @@ class PacketRadioApp:
             lon = str(aprs_packet.get('longitude', 'unknown'))
             from_callsign = str(aprs_packet.get('from', 'unknown'))
             
-            self.send_to_web(lat, lon, from_callsign, line)
             print(lat, lon)
             print("From Callsign:", from_callsign)
 
@@ -1335,7 +1263,6 @@ class PacketRadioApp:
             # Handle the exception (or ignore it, if no handling is needed)
             print("Error while parsing APRS packet:", e)
             # Still send the line data to the web in case of an exception
-            self.send_to_web('unknown', 'unknown', 'unknown', line)
             
             
     def parse_packet(self, line):
