@@ -4,7 +4,6 @@ Check out the Bigfoot Amateur Radio Club WA7BF
 pip install aprslib<br>
 pin install requests<br>
 pip install flask<br>
-pip install socketio<br>
 pip install flask-socketio<br>
 <br><br><br>
 For OSM Mapping. If the server.py doesn't open the map automatically at start. You can find it through your browser at http://127.0.0.1:5000
