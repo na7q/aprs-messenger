@@ -13,6 +13,9 @@ import aprslib
 import time
 import errno
 from tkinter import ttk
+import socketio
+from flask import Flask, render_template
+from flask_socketio import SocketIO
 
 #Default Font Family: Segoe UI
 #Default Font Size: 9
@@ -315,6 +318,29 @@ COMMENT_DATA = {
     "*v": {"vendor": "KissOZ", "model": "Tracker", "class": "tracker"},
 }
 
+def run_flask_app():
+
+    try:
+        app = Flask(__name__)
+        socketio = SocketIO(app, cors_allowed_origins="*")
+
+        @app.route('/')
+        def index():
+            return render_template('map.html')
+
+        @socketio.on('update_map')
+        def handle_update(data):
+            print(f"Received data from Python script: {data}")
+            socketio.emit('update_map', data)
+
+        def open_browser():
+            #time.sleep(2)
+            webbrowser.open('http://127.0.0.1:5000')
+
+        socketio.start_background_task(open_browser)
+        socketio.run(app, debug=False, use_reloader=False)
+    except Exception as e:
+        print(f"Error starting Flask app: {e}")
 
 #Implementation for ack check with Message Retries #TODO
 def process_ack_id(from_callsign, ack_id):
@@ -473,7 +499,20 @@ def decode_kiss_frame(kiss_frame):
                                 path_chunk = paths[i:i+7]
                                 path_address = decode_address(path_chunk)
 
-                                if path_chunk[-1] in [0xE0, 0xE1, 0xE2, 0xE3, 0xE4, 0xE5, 0xE6, 0xE7, 0xE8, 0xE9]:
+                                digi = False  # Initialize digi to False
+
+                                # 7th byte carries SSID or digi:
+                                seven_chunk = path_chunk[6] & 0xFF
+                                                        
+                                #print(f"Path (Hex): {' '.join([hex(b)[2:].zfill(2) for b in path_chunk])}")
+
+                                if seven_chunk & 0x80:
+                                    digi = True
+
+                                print(digi)
+
+                                # Check if digi is True, then append '*' to the path_address_with_asterisk
+                                if digi:
                                     path_address_with_asterisk = f"{path_address}*"
                                 else:
                                     path_address_with_asterisk = path_address
@@ -507,6 +546,7 @@ class PacketRadioApp:
         root.title("NA7Q Messenger")
     
         self.socket = None
+
 
         # Dark theme colors
         bg_color = "#121212"  # Dark gray background
@@ -708,6 +748,51 @@ class PacketRadioApp:
         self.menu_bar.add_cascade(label="About", command=self.show_about)
     
         self.send_beacon_auto()
+
+        # Comment out the Flask thread part
+        flask_thread = threading.Thread(target=run_flask_app)
+        flask_thread.daemon = True
+        flask_thread.start()
+        
+        # Additional initialization for socket.io
+        self.sio = socketio.Client()
+        self.sio.on('connect', self.on_socket_connect)
+        self.sio.on('disconnect', self.on_socket_disconnect)
+        
+        # Start a thread to run the socket.io client in the background
+        self.socket_io_thread = threading.Thread(target=self.connect_socket_io)
+        self.socket_io_thread.daemon = True
+        self.socket_io_thread.start()
+
+    
+    def on_socket_connect(self):
+        print("Connected to server")
+
+    def on_socket_disconnect(self):
+        print("Disconnected from server")
+
+    def connect_socket_io(self):
+        try:
+            self.sio.connect('http://127.0.0.1:5000')  # Change the address if your server is running on a different host or port
+            self.sio.wait()  # This blocks until the connection is closed
+
+        except Exception as e:
+            print(f"Error connecting to mapping web server: {e}")
+        
+        
+    def send_to_web(self, lat, lon, callsign, line):
+        try:
+            formatted_time = datetime.now().strftime("%H:%M:%S")
+
+            test_data = {'lat': lat, 'lon': lon, 'callsign': callsign, 'raw_packet': line, 'formatted_time': formatted_time}
+            print("send to web", test_data)
+
+            # Emit test data to the socket.io server
+            self.sio.emit('update_map', test_data)
+            print(f"Test data sent to the server: {test_data}")
+
+        except Exception as e:
+            print(f"Error sending test data: {e}")
 
     def focus_message_entry(self, event):
         # Change the focus to the message_entry widget
@@ -1061,6 +1146,8 @@ class PacketRadioApp:
                 # Display success message in the GUI
                 self.display_packet(formatted_time, "Beacon Sent successfully")
 
+                self.aprslib_parse(raw_packet)
+
             except Exception as e:
                 # Handle errors if sending fails
                 error_message = f"Failed to send beacon: {str(e)}"
@@ -1102,6 +1189,9 @@ class PacketRadioApp:
 
             # Display success message in the GUI
             self.display_packet(formatted_time, "Beacon Sent successfully")
+            
+            self.aprslib_parse(raw_packet)
+
 
         except Exception as e:
             # Handle errors if sending fails
@@ -1229,16 +1319,23 @@ class PacketRadioApp:
     def aprslib_parse(self, line):
         try:
             aprs_packet = aprslib.parse(line.strip())
-            lat = aprs_packet['latitude']
-            lon = aprs_packet['longitude']
-            from_callsign = aprs_packet['from']
+            print(aprs_packet)
+            print("line", line)
 
+            # Check if lat or lon is None, and set them to "null"
+            lat = str(aprs_packet.get('latitude', 'unknown'))
+            lon = str(aprs_packet.get('longitude', 'unknown'))
+            from_callsign = str(aprs_packet.get('from', 'unknown'))
+            
+            self.send_to_web(lat, lon, from_callsign, line)
             print(lat, lon)
             print("From Callsign:", from_callsign)
 
         except Exception as e:
             # Handle the exception (or ignore it, if no handling is needed)
             print("Error while parsing APRS packet:", e)
+            # Still send the line data to the web in case of an exception
+            self.send_to_web('unknown', 'unknown', 'unknown', line)
             
             
     def parse_packet(self, line):
@@ -1439,6 +1536,10 @@ class PacketRadioApp:
             #added to callsign
             self.display_packet_messages(formatted_time, arg1, to, arg3, self.message_id)
 
+            #added to update web live feed
+            self.aprslib_parse(raw_packet)
+
+
             # Add the sent message details to the sent_messages dictionary
             self.sent_messages[self.message_id] = {
                 'formatted_message': formatted_message,
@@ -1524,6 +1625,10 @@ class PacketRadioApp:
                 self.display_packet(formatted_time, raw_packet)
                 self.display_packet(formatted_time, f"Retry {message_retry_count} Sent successfully (Interval: {retry_interval} seconds)")
 
+                #added to update web live feed
+                self.aprslib_parse(raw_packet)
+
+
                 # Restart the timer for the next retry
                 self.sent_messages[message_id]['timer'] = threading.Timer(retry_interval, self.retry_message, args=[message_id])
                 self.sent_messages[message_id]['timer'].start()
@@ -1550,6 +1655,8 @@ class PacketRadioApp:
         message_id_str = str(message_id)
         
         return message_id_str in ack_set
+
+
 
 # Create the main window
 root = tk.Tk()
